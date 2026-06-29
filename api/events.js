@@ -10,7 +10,7 @@ const { query } = require('../config/database');
 // =========================================================
 //   GET ALL EVENTS
 // =========================================================
-router.get('/api/events', async (req, res) => {
+router.get('/events', async (req, res) => {
     try {
         const events = await query(`
             SELECT * FROM events 
@@ -26,7 +26,7 @@ router.get('/api/events', async (req, res) => {
 // =========================================================
 //   GET UPCOMING EVENTS
 // =========================================================
-router.get('/api/events/upcoming', async (req, res) => {
+router.get('/events/upcoming', async (req, res) => {
     try {
         const events = await query(`
             SELECT * FROM events 
@@ -44,7 +44,7 @@ router.get('/api/events/upcoming', async (req, res) => {
 // =========================================================
 //   GET SINGLE EVENT
 // =========================================================
-router.get('/api/events/:id', async (req, res) => {
+router.get('/events/:id', async (req, res) => {
     try {
         const event = await query(`
             SELECT * FROM events WHERE id = $1
@@ -64,7 +64,7 @@ router.get('/api/events/:id', async (req, res) => {
 // =========================================================
 //   POST NEW EVENT
 // =========================================================
-router.post('/api/events', async (req, res) => {
+router.post('/events', async (req, res) => {
     try {
         const { title, description, event_date, event_time, category, is_holiday } = req.body;
         
@@ -101,7 +101,7 @@ router.post('/api/events', async (req, res) => {
 // =========================================================
 //   UPDATE EVENT
 // =========================================================
-router.put('/api/events/:id', async (req, res) => {
+router.put('/events/:id', async (req, res) => {
     try {
         const id = req.params.id;
         const { title, description, event_date, event_time, category, is_holiday } = req.body;
@@ -144,7 +144,7 @@ router.put('/api/events/:id', async (req, res) => {
 // =========================================================
 //   DELETE EVENT
 // =========================================================
-router.delete('/api/events/:id', async (req, res) => {
+router.delete('/events/:id', async (req, res) => {
     try {
         const id = req.params.id;
         

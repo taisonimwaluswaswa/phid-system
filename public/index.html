@@ -3578,7 +3578,7 @@
         // =========================================================
         function initSSE() {
             try {
-                const evtSource = new EventSource(API_BASE + '/api/events');
+                const evtSource = new EventSource(API_BASE + '/events');
                 evtSource.onmessage = () => { incrementNotif(); loadAllData(); };
                 evtSource.onerror = () => setTimeout(initSSE, 5000);
             } catch (e) { setInterval(loadAllData, 15000); }
@@ -3588,7 +3588,7 @@
             try {
                 const [conv, evt, nd] = await Promise.all([
                     fetch(API_BASE + '/converts').then(r => r.json()).catch(() => []),
-                    fetch(API_BASE + '/api/events').then(r => r.json()).catch(() => []),
+                    fetch(API_BASE + '/events').then(r => r.json()).catch(() => []),
                     fetch(API_BASE + '/needs').then(r => r.json()).catch(() => [])
                 ]);
                 converts = conv || []; events = evt || []; needs = nd || [];
@@ -4010,7 +4010,7 @@
 
         async function addEventToDB(eventData) {
             try {
-                const res = await fetch('/api/events', {
+                const res = await fetch('/events', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(eventData)
@@ -4069,7 +4069,7 @@
 
         async function deleteEvent(id) {
             try {
-                await fetch(`/api/events/${id}`, { method: 'DELETE' });
+                await fetch(`/events/${id}`, { method: 'DELETE' });
                 events = events.filter(e => e.id !== id);
                 renderCalendar();
                 renderUpcomingEvents();
