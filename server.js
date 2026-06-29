@@ -4,22 +4,38 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== MULTER MEMORY STORAGE (BASE64) =====
-const storage = multer.memoryStorage();
+// ===== HAKIKISHA FOLDER ZIPO =====
+const uploadsDir = path.join(__dirname, 'uploads');
+const missionsDir = path.join(uploadsDir, 'missions');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+if (!fs.existsSync(missionsDir)) fs.mkdirSync(missionsDir, { recursive: true });
+
+// ===== MULTER - DISKSTORAGE =====
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, missionsDir);
+    },
+    filename: function (req, file, cb) {
+        const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, file.fieldname + '_' + unique + ext);
+    }
+});
+
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 100 * 1024 * 1024 } // 100MB
+    limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 // ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
-
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -40,7 +56,7 @@ app.get('/api/missions', async (req, res) => {
 });
 
 // ============================================================
-//  POST MISSION - MEMORY STORAGE (BASE64)
+//  POST MISSION
 // ============================================================
 app.post('/api/missions', upload.fields([
     { name: 'image', maxCount: 1 },
@@ -49,7 +65,7 @@ app.post('/api/missions', upload.fields([
     try {
         console.log('📥 ===== POST /api/missions =====');
         console.log('📥 Body:', req.body);
-        console.log('📥 Files:', req.files);
+        console.log('📥 Files:', req.files ? Object.keys(req.files) : 'NONE');
 
         const { name, lat, lng, date, people, description, city } = req.body;
 
@@ -57,35 +73,37 @@ app.post('/api/missions', upload.fields([
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // ===== PICHA (base64) =====
-        let imageBase64 = null;
+        // ===== PICHA =====
+        let imagePath = null;
         let imageType = null;
         if (req.files && req.files.image && req.files.image.length > 0) {
-            imageBase64 = req.files.image[0].buffer.toString('base64');
-            imageType = req.files.image[0].mimetype;
-            console.log('📸 Image size:', req.files.image[0].size);
+            const file = req.files.image[0];
+            imagePath = '/uploads/missions/' + file.filename;
+            imageType = file.mimetype;
+            console.log('📸 Image saved:', imagePath);
         }
 
-        // ===== VIDEO (base64) =====
-        let videoBase64 = null;
+        // ===== VIDEO =====
+        let videoPath = null;
         let videoType = null;
         if (req.files && req.files.video && req.files.video.length > 0) {
-            videoBase64 = req.files.video[0].buffer.toString('base64');
-            videoType = req.files.video[0].mimetype;
-            console.log('🎥 Video size:', req.files.video[0].size);
+            const file = req.files.video[0];
+            videoPath = '/uploads/missions/' + file.filename;
+            videoType = file.mimetype;
+            console.log('🎥 Video saved:', videoPath);
         }
 
         // ===== INSERT =====
         const result = await query(`
             INSERT INTO missions 
             (name, lat, lng, city, date, people_reached, description, 
-             image_base64, image_type, video_base64, video_type, created_at) 
+             image_path, image_type, video_path, video_type, created_at) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
             RETURNING id
         `, [
             name, parseFloat(lat), parseFloat(lng), city || '', date,
             parseInt(people) || 0, description || '',
-            imageBase64, imageType, videoBase64, videoType
+            imagePath, imageType, videoPath, videoType
         ]);
 
         console.log('✅ Saved ID:', result[0].id);
@@ -96,43 +114,13 @@ app.post('/api/missions', upload.fields([
     } catch (error) {
         console.error('❌ POST ERROR:', error.message);
         
-        // ===== FIX DUPLICATE KEY ERROR =====
-        if (error.message.includes('duplicate key value violates unique constraint')) {
+        // ===== IKIWA DUPLICATE KEY, REKEBISHA SEQUENCE =====
+        if (error.message.includes('duplicate key')) {
             try {
-                // Reset sequence
-                await query(`SELECT setval('missions_id_seq', (SELECT COALESCE(MAX(id), 0) FROM missions))`);
-                console.log('🔄 Sequence reset successfully');
-                
-                // Jaribu tena
-                const { name, lat, lng, date, people, description, city } = req.body;
-                let imageBase64 = null, imageType = null, videoBase64 = null, videoType = null;
-                
-                if (req.files && req.files.image && req.files.image.length > 0) {
-                    imageBase64 = req.files.image[0].buffer.toString('base64');
-                    imageType = req.files.image[0].mimetype;
-                }
-                if (req.files && req.files.video && req.files.video.length > 0) {
-                    videoBase64 = req.files.video[0].buffer.toString('base64');
-                    videoType = req.files.video[0].mimetype;
-                }
-                
-                const result = await query(`
-                    INSERT INTO missions 
-                    (name, lat, lng, city, date, people_reached, description, 
-                     image_base64, image_type, video_base64, video_type, created_at) 
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-                    RETURNING id
-                `, [
-                    name, parseFloat(lat), parseFloat(lng), city || '', date,
-                    parseInt(people) || 0, description || '',
-                    imageBase64, imageType, videoBase64, videoType
-                ]);
-                
-                const newMission = await query('SELECT * FROM missions WHERE id = $1', [result[0].id]);
-                return res.status(201).json({ success: true, data: newMission[0] });
-            } catch (retryError) {
-                console.error('❌ Retry error:', retryError.message);
-                return res.status(500).json({ error: retryError.message });
+                await query(`SELECT setval('missions_id_seq', (SELECT COALESCE(MAX(id), 0) FROM missions) + 1)`);
+                console.log('✅ Sequence reset successfully');
+            } catch (seqError) {
+                console.error('❌ Sequence reset failed:', seqError.message);
             }
         }
         
@@ -214,6 +202,9 @@ app.get('/api/debug', async (req, res) => {
             .badge-yes { background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
             .badge-no { background: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
             img, video { max-width: 150px; max-height: 120px; border-radius: 6px; }
+            .nav-links { margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap; }
+            .nav-links a { color: #3498db; text-decoration: none; padding: 8px 16px; border: 1px solid #3498db; border-radius: 6px; }
+            .nav-links a:hover { background: #3498db; color: white; }
         </style>
         </head>
         <body>
@@ -222,8 +213,8 @@ app.get('/api/debug', async (req, res) => {
             <div class="stats">
                 <div class="stat-card"><div class="number">${missions.length}</div><div class="label">Missions</div></div>
                 <div class="stat-card"><div class="number">${events.length}</div><div class="label">Events</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.image_base64).length}</div><div class="label">With Images</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.video_base64).length}</div><div class="label">With Videos</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.image_path).length}</div><div class="label">With Images</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.video_path).length}</div><div class="label">With Videos</div></div>
             </div>
             <h2>📋 MISSIONS</h2>
             <table>
@@ -234,8 +225,8 @@ app.get('/api/debug', async (req, res) => {
                         <td>${m.name}</td>
                         <td>${m.lat}, ${m.lng}</td>
                         <td>${m.date}</td>
-                        <td>${m.image_base64 ? `<span class="badge-yes">YES</span><br><img src="data:${m.image_type};base64,${m.image_base64}">` : '<span class="badge-no">NO</span>'}</td>
-                        <td>${m.video_base64 ? `<span class="badge-yes">YES</span><br><video controls src="data:${m.video_type};base64,${m.video_base64}" style="max-width:150px;max-height:100px;"></video>` : '<span class="badge-no">NO</span>'}</td>
+                        <td>${m.image_path ? `<span class="badge-yes">YES</span><br><img src="${m.image_path}" style="max-width:120px;">` : '<span class="badge-no">NO</span>'}</td>
+                        <td>${m.video_path ? `<span class="badge-yes">YES</span><br><video controls src="${m.video_path}" style="max-width:180px;max-height:120px;"></video>` : '<span class="badge-no">NO</span>'}</td>
                     </tr>
                 `).join('')}
             </table>
@@ -246,8 +237,13 @@ app.get('/api/debug', async (req, res) => {
                     <tr><td>${e.id}</td><td>${e.title}</td><td>${e.event_date}</td><td>${e.category}</td></tr>
                 `).join('')}
             </table>
-            <br>
-            <a href="/api/debug">🔄 Refresh</a> | <a href="/">🏠 Home</a> | <a href="/mission-report">📋 Form</a>
+            <div class="nav-links">
+                <a href="/api/debug">🔄 Refresh</a>
+                <a href="/">🏠 Home</a>
+                <a href="/mission-report">📋 Mission Form</a>
+                <a href="/api/missions">📡 Missions API</a>
+                <a href="/api/events">📡 Events API</a>
+            </div>
         </div>
         </body>
         </html>
