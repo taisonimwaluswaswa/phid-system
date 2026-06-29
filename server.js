@@ -21,6 +21,18 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api', missionRoutes);
 app.use('/api', eventRoutes);
 
+// Legacy routes (converts, needs, events)
+app.get('/converts', (req, res) => res.json([]));
+app.get('/needs', (req, res) => res.json([]));
+app.get('/events', async (req, res) => {
+    try {
+        const { query } = require('./config/database');
+        const events = await query('SELECT * FROM events ORDER BY event_date ASC');
+        res.json(events);
+    } catch(e) {
+        res.json([]);
+    }
+});
 app.get('/ping', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
