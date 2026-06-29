@@ -16,6 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
+        /* ... (style zote zimesalia sawa kabisa) ... */
         :root {
             --primary: #fe7a23;
             --secondary: #603913;
@@ -29,12 +30,7 @@
             --danger: #e74c3c;
             --warning: #f39c12;
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
@@ -43,13 +39,8 @@
             background: #f5f0eb;
             overflow-x: hidden;
         }
-        a {
-            color: var(--primary);
-            text-decoration: none;
-        }
-        a:hover {
-            color: var(--secondary);
-        }
+        a { color: var(--primary); text-decoration: none; }
+        a:hover { color: var(--secondary); }
 
         .top-bar {
             background: var(--secondary);
@@ -268,8 +259,14 @@
             cursor: pointer;
         }
         .nav-bar a:hover, .nav-bar a.active { border-bottom-color: var(--gold); color: #fff; }
-        .nav-bar .nav-right { margin-left: auto; display: flex; align-items: center; gap: 15px; }
-        .nav-bar .nav-right .user-info { color: #f5e6c8; font-size: 13px; }
+        .nav-bar .nav-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        /* User info imeondolewa kutoka nav-right */
+        .nav-bar .nav-right .user-info { display: none; }
 
         .dropdown { position: relative; display: inline-block; }
         .dropdown-content {
@@ -423,6 +420,100 @@
             height: 100%;
             border: none;
             border-radius: 8px;
+        }
+
+        .accordion-card {
+            background: #fff;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 2px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeSlideUp 0.5s ease forwards;
+            position: relative;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+        .accordion-card:nth-child(1) { animation-delay: 0.1s; }
+        .accordion-card:nth-child(2) { animation-delay: 0.2s; }
+        .accordion-card:nth-child(3) { animation-delay: 0.3s; }
+        .accordion-card:nth-child(4) { animation-delay: 0.4s; }
+        .accordion-card:nth-child(5) { animation-delay: 0.5s; }
+        .accordion-card:nth-child(6) { animation-delay: 0.6s; }
+        .accordion-card:nth-child(7) { animation-delay: 0.7s; }
+        .accordion-card:nth-child(8) { animation-delay: 0.8s; }
+
+        .accordion-card::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            border-radius: 8px;
+            background: linear-gradient(45deg, var(--gold), var(--primary), var(--gold));
+            background-size: 300% 300%;
+            z-index: -1;
+            animation: gradientMove 3s ease infinite;
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .accordion-card:hover { transform: scale(1.008); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+        .accordion-card .card-header {
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fff;
+            transition: 0.2s;
+        }
+        .accordion-card .card-header:hover { background: #f8f4ec; }
+        .accordion-card .card-header .title {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .accordion-card .card-header .title i { color: var(--primary); }
+        .accordion-card .card-header .arrow { color: var(--gray); transition: 0.3s; }
+        .accordion-card .card-header .arrow.open { transform: rotate(180deg); }
+        .accordion-card .card-body {
+            padding: 0 18px 18px 18px;
+            display: none;
+            border-top: 1px solid #f0ebe3;
+            color: #5a4a3a;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+        .accordion-card .card-body.open { display: block; animation: slideDown 0.3s ease; }
+        @keyframes slideDown {
+            0% { opacity: 0; transform: translateY(-8px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .accordion-card .card-body .sub-list { list-style: none; padding: 0; margin-top: 8px; }
+        .accordion-card .card-body .sub-list li {
+            padding: 6px 0;
+            border-bottom: 1px solid #f0ebe3;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .accordion-card .card-body .sub-list li i { width: 18px; }
+        .accordion-card .card-body .sub-list li:last-child { border-bottom: none; }
+
+        .accordion-card .card-body .sub-list li a {
+            color: var(--dark);
+            transition: 0.2s;
+        }
+        .accordion-card .card-body .sub-list li a:hover {
+            color: var(--primary);
         }
 
         .dept-grid {
@@ -1388,8 +1479,9 @@
             </div>
         </div>
         <a onclick="showPage('mission')"><i class="fas fa-globe-africa"></i> <span class="lang-sw">Umisheni</span><span class="lang-en">Mission</span></a>
+        <!-- Nav-right imebaki lakini user-info imefichwa -->
         <div class="nav-right">
-            <span class="user-info" id="userDisplay"><i class="fas fa-user"></i> evangelist</span>
+            <!-- User info imeondolewa -->
         </div>
     </nav>
 
@@ -1539,12 +1631,13 @@
                 <div class="leader-section-title" id="assistantPastorsTitle"><i class="fas fa-hands-helping"></i> <span class="lang-sw">Viongozi Wasaidizi</span><span class="lang-en">Assistant Pastors</span></div>
                 
                 <div class="leader-carousel" id="assistantCarousel">
+                    <!-- SLIDE 1: Emmanuel Mwigulu (badala ya Migulu) -->
                     <div class="leader-slide active" data-index="0">
                         <div class="avatar assistant">
-                            <img src="uploads/augustin.png" alt="Pastor Migulu" onerror="this.style.display='none';this.parentElement.textContent='👤'" />
+                            <img src="uploads/augustin.png" alt="Emmanuel Mwigulu" onerror="this.style.display='none';this.parentElement.textContent='👤'" />
                         </div>
                         <div class="info">
-                            <div class="name">Migulu</div>
+                            <div class="name">Emmanuel Mwigulu</div>
                             <div class="title"><span class="lang-sw">Mchungaji Msaidizi / PHID - MAKONGO</span><span class="lang-en">Assistant Pastor / PHID - MAKONGO</span></div>
                         </div>
                         <span class="badge assistant"><span class="lang-sw">MCHUNGAJI MSAIDIZI</span><span class="lang-en">ASSISTANT PASTOR</span></span>
