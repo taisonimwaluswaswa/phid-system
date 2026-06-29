@@ -4,12 +4,35 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== MULTER SETUP =====
-const storage = multer.memoryStorage();
+// ===== HAKIKISHA FOLDER ZIPO =====
+const uploadsDir = path.join(__dirname, 'uploads');
+const missionsDir = path.join(uploadsDir, 'missions');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+if (!fs.existsSync(missionsDir)) fs.mkdirSync(missionsDir);
+
+// ===== MULTER DISKSTORAGE =====
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        if (file.fieldname === 'image') {
+            cb(null, missionsDir);
+        } else if (file.fieldname === 'video') {
+            cb(null, missionsDir);
+        } else {
+            cb(null, uploadsDir);
+        }
+    },
+    filename: function (req, file, cb) {
+        const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, file.fieldname + '_' + unique + ext);
+    }
+});
+
 const upload = multer({
     storage: storage,
     limits: { fileSize: 100 * 1024 * 1024 } // 100MB
@@ -24,7 +47,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ============================================================
-//  DATABASE QUERY HELPER
+//  DATABASE
 // ============================================================
 const { query } = require('./config/database');
 
@@ -36,13 +59,13 @@ app.get('/api/missions', async (req, res) => {
         const missions = await query('SELECT * FROM missions ORDER BY created_at DESC');
         res.json(missions);
     } catch (error) {
-        console.error('❌ GET /api/missions error:', error.message);
+        console.error('❌ GET error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
 // ============================================================
-//  POST MISSION – ILIYOSAHIHISHWA KABISA
+//  POST MISSION - WITH DISKSTORAGE
 // ============================================================
 app.post('/api/missions', upload.fields([
     { name: 'image', maxCount: 1 },
@@ -59,48 +82,40 @@ app.post('/api/missions', upload.fields([
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // ===== PROCESS IMAGE =====
-        let imageBase64 = null;
+        // ===== PICHA - SAVE PATH =====
+        let imagePath = null;
         let imageType = null;
         if (req.files && req.files.image && req.files.image.length > 0) {
-            try {
-                imageBase64 = req.files.image[0].buffer.toString('base64');
-                imageType = req.files.image[0].mimetype;
-                console.log('📸 Image OK, size:', req.files.image[0].size);
-            } catch (e) {
-                console.error('❌ Image error:', e.message);
-            }
+            const file = req.files.image[0];
+            imagePath = '/uploads/missions/' + file.filename;
+            imageType = file.mimetype;
+            console.log('📸 Image saved:', imagePath);
         }
 
-        // ===== PROCESS VIDEO =====
-        let videoBase64 = null;
+        // ===== VIDEO - SAVE PATH =====
+        let videoPath = null;
         let videoType = null;
         if (req.files && req.files.video && req.files.video.length > 0) {
-            try {
-                videoBase64 = req.files.video[0].buffer.toString('base64');
-                videoType = req.files.video[0].mimetype;
-                console.log('🎥 Video OK, size:', req.files.video[0].size);
-            } catch (e) {
-                console.error('❌ Video error:', e.message);
-            }
+            const file = req.files.video[0];
+            videoPath = '/uploads/missions/' + file.filename;
+            videoType = file.mimetype;
+            console.log('🎥 Video saved:', videoPath);
         }
 
-        // ===== INSERT =====
+        // ===== INSERT KWENYE DATABASE =====
         const result = await query(`
             INSERT INTO missions 
             (name, lat, lng, city, date, people_reached, description, 
-             image_base64, image_type, video_base64, video_type, created_at) 
+             image_path, image_type, video_path, video_type, created_at) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
             RETURNING id
         `, [
             name, parseFloat(lat), parseFloat(lng), city || '', date,
             parseInt(people) || 0, description || '',
-            imageBase64, imageType, videoBase64, videoType
+            imagePath, imageType, videoPath, videoType
         ]);
 
         console.log('✅ Saved ID:', result[0].id);
-        console.log('📸 Image saved:', imageBase64 ? 'YES' : 'NO');
-        console.log('🎥 Video saved:', videoBase64 ? 'YES' : 'NO');
 
         const newMission = await query('SELECT * FROM missions WHERE id = $1', [result[0].id]);
         res.status(201).json({ success: true, data: newMission[0] });
@@ -112,7 +127,7 @@ app.post('/api/missions', upload.fields([
 });
 
 // ============================================================
-//  EVENTS ROUTES (Rahisi)
+//  EVENTS
 // ============================================================
 app.get('/api/events', async (req, res) => {
     try {
@@ -158,7 +173,7 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-//  DEBUG VIEWER – ILIYOSAHIHISHWA
+//  DEBUG VIEWER
 // ============================================================
 app.get('/api/debug', async (req, res) => {
     try {
@@ -175,7 +190,7 @@ app.get('/api/debug', async (req, res) => {
             body { font-family: Arial; margin: 20px; background: #f0f2f5; }
             .container { max-width: 1200px; margin: auto; }
             h1 { color: #2c3e50; }
-            .stats { display: flex; gap: 20px; margin: 20px 0; }
+            .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
             .stat-card { background: white; padding: 15px 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
             .stat-card .number { font-size: 28px; font-weight: bold; }
             .stat-card .label { color: #7f8c8d; font-size: 14px; }
@@ -184,7 +199,10 @@ app.get('/api/debug', async (req, res) => {
             td { padding: 10px; border-bottom: 1px solid #ecf0f1; vertical-align: middle; }
             .badge-yes { background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
             .badge-no { background: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
-            img, video { max-width: 100px; max-height: 100px; border-radius: 6px; }
+            img, video { max-width: 150px; max-height: 120px; border-radius: 6px; }
+            .nav-links { margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap; }
+            .nav-links a { color: #3498db; text-decoration: none; padding: 8px 16px; border: 1px solid #3498db; border-radius: 6px; }
+            .nav-links a:hover { background: #3498db; color: white; }
         </style>
         </head>
         <body>
@@ -193,10 +211,10 @@ app.get('/api/debug', async (req, res) => {
             <div class="stats">
                 <div class="stat-card"><div class="number">${missions.length}</div><div class="label">Missions</div></div>
                 <div class="stat-card"><div class="number">${events.length}</div><div class="label">Events</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.image_base64).length}</div><div class="label">With Images</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.video_base64).length}</div><div class="label">With Videos</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.image_path).length}</div><div class="label">With Images</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.video_path).length}</div><div class="label">With Videos</div></div>
             </div>
-            <h2>MISSIONS</h2>
+            <h2>📋 MISSIONS</h2>
             <table>
                 <tr><th>ID</th><th>Name</th><th>Location</th><th>Date</th><th>Image</th><th>Video</th></tr>
                 ${missions.map(m => `
@@ -205,20 +223,25 @@ app.get('/api/debug', async (req, res) => {
                         <td>${m.name}</td>
                         <td>${m.lat}, ${m.lng}</td>
                         <td>${m.date}</td>
-                        <td>${m.image_base64 ? `<span class="badge-yes">YES</span><br><img src="data:${m.image_type};base64,${m.image_base64}">` : '<span class="badge-no">NO</span>'}</td>
-                        <td>${m.video_base64 ? `<span class="badge-yes">YES</span><br><video controls src="data:${m.video_type};base64,${m.video_base64}" style="max-width:150px;max-height:100px;"></video>` : '<span class="badge-no">NO</span>'}</td>
+                        <td>${m.image_path ? `<span class="badge-yes">YES</span><br><img src="${m.image_path}" style="max-width:120px;">` : '<span class="badge-no">NO</span>'}</td>
+                        <td>${m.video_path ? `<span class="badge-yes">YES</span><br><video controls src="${m.video_path}" style="max-width:180px;max-height:120px;"></video>` : '<span class="badge-no">NO</span>'}</td>
                     </tr>
                 `).join('')}
             </table>
-            <h2>EVENTS</h2>
+            <h2>📅 EVENTS</h2>
             <table>
                 <tr><th>ID</th><th>Title</th><th>Date</th><th>Category</th></tr>
                 ${events.map(e => `
                     <tr><td>${e.id}</td><td>${e.title}</td><td>${e.event_date}</td><td>${e.category}</td></tr>
                 `).join('')}
             </table>
-            <br>
-            <a href="/api/debug">🔄 Refresh</a> | <a href="/">🏠 Home</a> | <a href="/mission-report">📋 Form</a>
+            <div class="nav-links">
+                <a href="/api/debug">🔄 Refresh</a>
+                <a href="/">🏠 Home</a>
+                <a href="/mission-report">📋 Mission Form</a>
+                <a href="/api/missions">📡 Missions API</a>
+                <a href="/api/events">📡 Events API</a>
+            </div>
         </div>
         </body>
         </html>
@@ -233,8 +256,10 @@ app.get('/api/debug', async (req, res) => {
 //  START
 // ============================================================
 app.listen(PORT, () => {
+    console.log('==================================================');
     console.log('✅ PHID SYSTEM RUNNING ON PORT', PORT);
-    console.log('📍 /api/missions');
-    console.log('📍 /api/events');
-    console.log('🐛 /api/debug');
+    console.log('==================================================');
+    console.log(`📍 API: http://localhost:${PORT}/api/missions`);
+    console.log(`🐛 Debug: http://localhost:${PORT}/api/debug`);
+    console.log('==================================================');
 });
