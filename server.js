@@ -65,7 +65,7 @@ app.get('/api/missions', async (req, res) => {
 });
 
 // ============================================================
-//  POST MISSION - WITH DISKSTORAGE
+//  POST MISSION
 // ============================================================
 app.post('/api/missions', upload.fields([
     { name: 'image', maxCount: 1 },
@@ -82,7 +82,7 @@ app.post('/api/missions', upload.fields([
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // ===== PICHA - SAVE PATH =====
+        // ===== PICHA =====
         let imagePath = null;
         let imageType = null;
         if (req.files && req.files.image && req.files.image.length > 0) {
@@ -92,7 +92,7 @@ app.post('/api/missions', upload.fields([
             console.log('📸 Image saved:', imagePath);
         }
 
-        // ===== VIDEO - SAVE PATH =====
+        // ===== VIDEO =====
         let videoPath = null;
         let videoType = null;
         if (req.files && req.files.video && req.files.video.length > 0) {
@@ -102,7 +102,7 @@ app.post('/api/missions', upload.fields([
             console.log('🎥 Video saved:', videoPath);
         }
 
-        // ===== INSERT KWENYE DATABASE =====
+        // ===== INSERT =====
         const result = await query(`
             INSERT INTO missions 
             (name, lat, lng, city, date, people_reached, description, 
@@ -173,7 +173,7 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-//  DEBUG VIEWER
+//  DEBUG VIEWER - ILIYOSAHIHISHWA KUONYESHA image_path NA video_path
 // ============================================================
 app.get('/api/debug', async (req, res) => {
     try {
@@ -183,69 +183,173 @@ app.get('/api/debug', async (req, res) => {
         let html = `
         <!DOCTYPE html>
         <html>
-        <head><title>PHID Database</title>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            body { font-family: Arial; margin: 20px; background: #f0f2f5; }
-            .container { max-width: 1200px; margin: auto; }
-            h1 { color: #2c3e50; }
-            .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
-            .stat-card { background: white; padding: 15px 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-            .stat-card .number { font-size: 28px; font-weight: bold; }
-            .stat-card .label { color: #7f8c8d; font-size: 14px; }
-            table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
-            th { background: #2c3e50; color: white; padding: 10px; text-align: left; }
-            td { padding: 10px; border-bottom: 1px solid #ecf0f1; vertical-align: middle; }
-            .badge-yes { background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
-            .badge-no { background: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
-            img, video { max-width: 150px; max-height: 120px; border-radius: 6px; }
-            .nav-links { margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap; }
-            .nav-links a { color: #3498db; text-decoration: none; padding: 8px 16px; border: 1px solid #3498db; border-radius: 6px; }
-            .nav-links a:hover { background: #3498db; color: white; }
-        </style>
+        <head>
+            <title>PHID Database Viewer</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                * { box-sizing: border-box; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; background: #f0f2f5; }
+                .container { max-width: 1400px; margin: 0 auto; }
+                h1 { color: #2c3e50; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+                h1 small { font-size: 16px; font-weight: normal; color: #7f8c8d; }
+                h2 { color: #34495e; margin-top: 30px; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+                .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+                .stat-card { background: white; padding: 15px 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex: 1; min-width: 150px; }
+                .stat-card .number { font-size: 28px; font-weight: bold; color: #2c3e50; }
+                .stat-card .label { color: #7f8c8d; font-size: 14px; }
+                .table-wrapper { overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 10px; }
+                table { width: 100%; border-collapse: collapse; font-size: 14px; }
+                th { background: #2c3e50; color: white; padding: 12px 10px; text-align: left; position: sticky; top: 0; z-index: 10; }
+                td { padding: 10px; border-bottom: 1px solid #ecf0f1; vertical-align: middle; }
+                tr:hover td { background: #f8f9fa; }
+                .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+                .badge-yes { background: #d4edda; color: #155724; }
+                .badge-no { background: #f8d7da; color: #721c24; }
+                .media-preview { max-width: 150px; max-height: 120px; border-radius: 8px; margin-top: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; }
+                video.media-preview { max-width: 200px; max-height: 140px; }
+                .nav-links { margin-top: 30px; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 20px; flex-wrap: wrap; }
+                .nav-links a { color: #3498db; text-decoration: none; padding: 8px 16px; border: 1px solid #3498db; border-radius: 6px; transition: all 0.3s; }
+                .nav-links a:hover { background: #3498db; color: white; }
+                .empty { text-align: center; color: #95a5a6; padding: 40px; font-size: 18px; }
+                .footer { margin-top: 20px; color: #95a5a6; font-size: 12px; text-align: center; }
+                .video-wrapper { max-width: 220px; }
+                @media (max-width: 768px) {
+                    table { font-size: 12px; }
+                    td, th { padding: 6px 4px; }
+                    .media-preview { max-width: 80px; max-height: 80px; }
+                    video.media-preview { max-width: 100px; max-height: 80px; }
+                    .stat-card .number { font-size: 20px; }
+                }
+            </style>
         </head>
         <body>
-        <div class="container">
-            <h1>📊 PHID DATABASE</h1>
-            <div class="stats">
-                <div class="stat-card"><div class="number">${missions.length}</div><div class="label">Missions</div></div>
-                <div class="stat-card"><div class="number">${events.length}</div><div class="label">Events</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.image_path).length}</div><div class="label">With Images</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.video_path).length}</div><div class="label">With Videos</div></div>
+            <div class="container">
+                <h1>📊 PHID DATABASE VIEWER <small>Potters House International Dar es Salaam</small></h1>
+                
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="number">${missions.length}</div>
+                        <div class="label">📋 Missions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${events.length}</div>
+                        <div class="label">📅 Events</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${missions.filter(m => m.image_path).length}</div>
+                        <div class="label">📸 With Images</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">${missions.filter(m => m.video_path).length}</div>
+                        <div class="label">🎥 With Videos</div>
+                    </div>
+                </div>
+                
+                <h2>📋 MISSIONS (${missions.length})</h2>
+                ${missions.length === 0 ? '<div class="empty">No missions found yet.</div>' : `
+                <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Location</th>
+                            <th>City</th>
+                            <th>Date</th>
+                            <th>People</th>
+                            <th>Image</th>
+                            <th>Video</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${missions.map(m => `
+                            <tr>
+                                <td><strong>${m.id}</strong></td>
+                                <td>
+                                    <strong>${m.name}</strong>
+                                    ${m.description ? `<br><small style="color:#666;">${m.description.substring(0, 60)}${m.description.length > 60 ? '...' : ''}</small>` : ''}
+                                </td>
+                                <td>${m.lat}, ${m.lng}</td>
+                                <td>${m.city || '-'}</td>
+                                <td>${m.date}</td>
+                                <td>${m.people_reached || 0}</td>
+                                <td>
+                                    ${m.image_path ? `
+                                        <span class="badge badge-yes">✅ YES</span><br>
+                                        <img src="${m.image_path}" class="media-preview" alt="Image" onclick="window.open(this.src)">
+                                    ` : `<span class="badge badge-no">❌ NO</span>`}
+                                </td>
+                                <td>
+                                    ${m.video_path ? `
+                                        <span class="badge badge-yes">✅ YES</span><br>
+                                        <div class="video-wrapper">
+                                            <video controls class="media-preview" onclick="this.paused ? this.play() : this.pause();">
+                                                <source src="${m.video_path}" type="${m.video_type || 'video/mp4'}">
+                                            </video>
+                                        </div>
+                                    ` : `<span class="badge badge-no">❌ NO</span>`}
+                                </td>
+                                <td style="font-size:12px; color:#666;">${new Date(m.created_at).toLocaleString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>
+                `}
+                
+                <h2>📅 EVENTS (${events.length})</h2>
+                ${events.length === 0 ? '<div class="empty">No events found yet.</div>' : `
+                <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Category</th>
+                            <th>Holiday</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${events.map(e => `
+                            <tr>
+                                <td>${e.id}</td>
+                                <td>
+                                    <strong>${e.title}</strong>
+                                    ${e.description ? `<br><small style="color:#666;">${e.description.substring(0, 50)}${e.description.length > 50 ? '...' : ''}</small>` : ''}
+                                </td>
+                                <td>${e.event_date}</td>
+                                <td>${e.event_time || '-'}</td>
+                                <td><span style="background:#e8f0fe; padding:3px 10px; border-radius:12px;">${e.category || 'Nyingine'}</span></td>
+                                <td>${e.is_holiday ? '✅ Yes' : '❌ No'}</td>
+                                <td style="font-size:12px; color:#666;">${new Date(e.created_at).toLocaleString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>
+                `}
+                
+                <div class="nav-links">
+                    <a href="/api/debug">🔄 Refresh</a>
+                    <a href="/">🏠 Home</a>
+                    <a href="/mission-report">📋 Mission Form</a>
+                    <a href="/api/missions">📡 Missions API (JSON)</a>
+                    <a href="/api/events">📡 Events API (JSON)</a>
+                </div>
+                
+                <div class="footer">
+                    PHID System v1.0 | ${new Date().toLocaleString()}
+                </div>
             </div>
-            <h2>📋 MISSIONS</h2>
-            <table>
-                <tr><th>ID</th><th>Name</th><th>Location</th><th>Date</th><th>Image</th><th>Video</th></tr>
-                ${missions.map(m => `
-                    <tr>
-                        <td>${m.id}</td>
-                        <td>${m.name}</td>
-                        <td>${m.lat}, ${m.lng}</td>
-                        <td>${m.date}</td>
-                        <td>${m.image_path ? `<span class="badge-yes">YES</span><br><img src="${m.image_path}" style="max-width:120px;">` : '<span class="badge-no">NO</span>'}</td>
-                        <td>${m.video_path ? `<span class="badge-yes">YES</span><br><video controls src="${m.video_path}" style="max-width:180px;max-height:120px;"></video>` : '<span class="badge-no">NO</span>'}</td>
-                    </tr>
-                `).join('')}
-            </table>
-            <h2>📅 EVENTS</h2>
-            <table>
-                <tr><th>ID</th><th>Title</th><th>Date</th><th>Category</th></tr>
-                ${events.map(e => `
-                    <tr><td>${e.id}</td><td>${e.title}</td><td>${e.event_date}</td><td>${e.category}</td></tr>
-                `).join('')}
-            </table>
-            <div class="nav-links">
-                <a href="/api/debug">🔄 Refresh</a>
-                <a href="/">🏠 Home</a>
-                <a href="/mission-report">📋 Mission Form</a>
-                <a href="/api/missions">📡 Missions API</a>
-                <a href="/api/events">📡 Events API</a>
-            </div>
-        </div>
         </body>
         </html>
         `;
+        
         res.send(html);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -257,9 +361,11 @@ app.get('/api/debug', async (req, res) => {
 // ============================================================
 app.listen(PORT, () => {
     console.log('==================================================');
-    console.log('✅ PHID SYSTEM RUNNING ON PORT', PORT);
+    console.log('✅ PHID SYSTEM RUNNING SUCCESSFULLY!');
     console.log('==================================================');
-    console.log(`📍 API: http://localhost:${PORT}/api/missions`);
-    console.log(`🐛 Debug: http://localhost:${PORT}/api/debug`);
+    console.log(`📋 Form: http://localhost:${PORT}/mission-report`);
+    console.log(`📍 API Missions: http://localhost:${PORT}/api/missions`);
+    console.log(`📍 API Events:   http://localhost:${PORT}/api/events`);
+    console.log(`🐛 Debug:        http://localhost:${PORT}/api/debug`);
     console.log('==================================================');
 });
