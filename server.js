@@ -18,11 +18,7 @@ if (!fs.existsSync(missionsDir)) fs.mkdirSync(missionsDir, { recursive: true });
 // ===== MULTER DISKSTORAGE =====
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        if (file.fieldname === 'image' || file.fieldname === 'video') {
-            cb(null, missionsDir);
-        } else {
-            cb(null, uploadsDir);
-        }
+        cb(null, missionsDir);
     },
     filename: function (req, file, cb) {
         const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -63,7 +59,7 @@ app.get('/api/missions', async (req, res) => {
 });
 
 // ============================================================
-//  POST MISSION - WITH DISKSTORAGE
+//  POST MISSION - ILIYOSAHIHISHWA
 // ============================================================
 app.post('/api/missions', upload.fields([
     { name: 'image', maxCount: 1 },
@@ -100,7 +96,7 @@ app.post('/api/missions', upload.fields([
             console.log('🎥 Video saved:', videoPath);
         }
 
-        // ===== INSERT =====
+        // ===== INSERT - HAKIKISHA ID INAGET OK =====
         const result = await query(`
             INSERT INTO missions 
             (name, lat, lng, city, date, people_reached, description, 
@@ -120,6 +116,18 @@ app.post('/api/missions', upload.fields([
 
     } catch (error) {
         console.error('❌ POST ERROR:', error.message);
+        console.error('❌ Stack:', error.stack);
+        
+        // Kama error ni duplicate key, rekebisha sequence
+        if (error.message.includes('duplicate key') || error.message.includes('violates unique constraint')) {
+            try {
+                await query(`SELECT setval('missions_id_seq', COALESCE((SELECT MAX(id) FROM missions), 0) + 1, false)`);
+                console.log('✅ Sequence reset successfully');
+            } catch (seqError) {
+                console.error('❌ Sequence reset failed:', seqError.message);
+            }
+        }
+        
         res.status(500).json({ error: error.message });
     }
 });
@@ -171,7 +179,7 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-//  DEBUG VIEWER - ILIYOSAHIHISHWA KABISA
+//  DEBUG VIEWER
 // ============================================================
 app.get('/api/debug', async (req, res) => {
     try {
@@ -182,14 +190,14 @@ app.get('/api/debug', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>PHID Database Viewer</title>
+            <title>PHID Database</title>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 * { box-sizing: border-box; }
                 body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f0f2f5; }
                 .container { max-width: 1400px; margin: 0 auto; }
-                h1 { color: #2c3e50; }
+                h1 { color: #2c3e50; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
                 h1 small { font-size: 16px; font-weight: normal; color: #7f8c8d; }
                 h2 { color: #34495e; margin-top: 30px; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
                 .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
@@ -204,14 +212,13 @@ app.get('/api/debug', async (req, res) => {
                 .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
                 .badge-yes { background: #d4edda; color: #155724; }
                 .badge-no { background: #f8d7da; color: #721c24; }
-                .media-preview { max-width: 120px; max-height: 120px; border-radius: 8px; margin-top: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                .media-preview { max-width: 120px; max-height: 120px; border-radius: 8px; margin-top: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; }
                 video.media-preview { max-width: 180px; max-height: 120px; }
                 .nav-links { margin-top: 30px; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 20px; flex-wrap: wrap; }
                 .nav-links a { color: #3498db; text-decoration: none; padding: 8px 16px; border: 1px solid #3498db; border-radius: 6px; transition: all 0.3s; }
                 .nav-links a:hover { background: #3498db; color: white; }
                 .empty { text-align: center; color: #95a5a6; padding: 40px; font-size: 18px; }
                 .footer { margin-top: 20px; color: #95a5a6; font-size: 12px; text-align: center; }
-                .video-container { max-width: 200px; }
                 @media (max-width: 768px) {
                     table { font-size: 12px; }
                     td, th { padding: 6px 4px; }
@@ -251,7 +258,7 @@ app.get('/api/debug', async (req, res) => {
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Name</th>
+                            <th>Name / Description</th>
                             <th>Location</th>
                             <th>City</th>
                             <th>Date</th>
@@ -265,7 +272,10 @@ app.get('/api/debug', async (req, res) => {
                         ${missions.map(m => `
                             <tr>
                                 <td><strong>${m.id}</strong></td>
-                                <td><strong>${m.name}</strong></td>
+                                <td>
+                                    <strong>${m.name}</strong>
+                                    ${m.description ? `<br><small style="color:#666;">${m.description.substring(0, 60)}${m.description.length > 60 ? '...' : ''}</small>` : ''}
+                                </td>
                                 <td>${m.lat}, ${m.lng}</td>
                                 <td>${m.city || '-'}</td>
                                 <td>${m.date}</td>
@@ -275,19 +285,17 @@ app.get('/api/debug', async (req, res) => {
                                         <span class="badge badge-yes">✅ YES</span><br>
                                         <img src="${m.image_path}" 
                                              class="media-preview" 
-                                             onclick="window.open('${m.image_path}')" 
-                                             alt="Image"
-                                             onerror="this.parentElement.innerHTML='<span style=\\'color:#999;\\'>❌ Image not found</span>'">
+                                             onclick="window.open(this.src)" 
+                                             alt="Image">
                                     ` : `<span class="badge badge-no">❌ NO</span>`}
                                 </td>
                                 <td>
                                     ${m.video_path ? `
                                         <span class="badge badge-yes">✅ YES</span><br>
-                                        <div class="video-container">
+                                        <div class="video-wrapper">
                                             <video controls class="media-preview" 
-                                                   onclick="this.paused ? this.play() : this.pause();"
-                                                   onerror="this.parentElement.innerHTML='<span style=\\'color:#999;\\'>❌ Video not found</span>'">
-                                                <source src="${m.video_path}" type="${m.video_type || 'video/mp4'}">
+                                                   onclick="this.paused ? this.play() : this.pause();">
+                                                <source src="${m.video_path}">
                                             </video>
                                         </div>
                                     ` : `<span class="badge badge-no">❌ NO</span>`}
@@ -307,8 +315,7 @@ app.get('/api/debug', async (req, res) => {
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Title</th>
-                            <th>Description</th>
+                            <th>Title / Description</th>
                             <th>Date</th>
                             <th>Time</th>
                             <th>Category</th>
@@ -320,8 +327,10 @@ app.get('/api/debug', async (req, res) => {
                         ${events.map(e => `
                             <tr>
                                 <td>${e.id}</td>
-                                <td><strong>${e.title}</strong></td>
-                                <td>${e.description || '-'}</td>
+                                <td>
+                                    <strong>${e.title}</strong>
+                                    ${e.description ? `<br><small style="color:#666;">${e.description.substring(0, 50)}${e.description.length > 50 ? '...' : ''}</small>` : ''}
+                                </td>
                                 <td>${e.event_date}</td>
                                 <td>${e.event_time || '-'}</td>
                                 <td><span style="background:#e8f0fe; padding:3px 10px; border-radius:12px;">${e.category || 'Nyingine'}</span></td>
@@ -361,11 +370,9 @@ app.get('/api/debug', async (req, res) => {
 // ============================================================
 app.listen(PORT, () => {
     console.log('==================================================');
-    console.log('✅ PHID SYSTEM RUNNING SUCCESSFULLY!');
+    console.log('✅ PHID SYSTEM RUNNING ON PORT', PORT);
     console.log('==================================================');
-    console.log(`📋 Form: http://localhost:${PORT}/mission-report`);
-    console.log(`📍 API Missions: http://localhost:${PORT}/api/missions`);
-    console.log(`📍 API Events:   http://localhost:${PORT}/api/events`);
-    console.log(`🐛 Debug:        http://localhost:${PORT}/api/debug`);
+    console.log(`📍 API: http://localhost:${PORT}/api/missions`);
+    console.log(`🐛 Debug: http://localhost:${PORT}/api/debug`);
     console.log('==================================================');
 });
