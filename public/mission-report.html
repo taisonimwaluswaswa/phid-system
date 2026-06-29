@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <title>PHID - Mission Report</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f0eb;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #fe7a23, #f58d48);
+            padding: 20px;
+            border-radius: 12px;
+            color: #fff;
+        }
+
+        .header .logo {
+            font-size: 40px;
+            margin-bottom: 8px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .access-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #fe7a23;
+            transition: 0.3s;
+        }
+
+        .access-section.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .access-section .access-title {
+            font-weight: 700;
+            color: #603913;
+            font-size: 16px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .access-section .access-title i {
+            color: #fe7a23;
+        }
+
+        .access-section .access-subtitle {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .access-input-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .access-input-group input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e8dfd1;
+            border-radius: 8px;
+            font-size: 16px;
+            text-align: center;
+            letter-spacing: 3px;
+            font-weight: 700;
+            background: #faf8f5;
+        }
+
+        .access-input-group input:focus {
+            outline: none;
+            border-color: #fe7a23;
+            box-shadow: 0 0 0 4px rgba(254,122,35,0.1);
+        }
+
+        .access-input-group button {
+            padding: 12px 24px;
+            background: #fe7a23;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .access-input-group button:hover {
+            background: #e0651a;
+            transform: translateY(-2px);
+        }
+
+        .access-error {
+            font-size: 13px;
+            color: #e74c3c;
+            margin-top: 8px;
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .access-error.show { display: flex; }
+
+        .access-success {
+            font-size: 13px;
+            color: #2ecc71;
+            margin-top: 8px;
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .access-success.show { display: flex; }
+
+        .access-attempts {
+            font-size: 12px;
+            color: #888;
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        .mission-form-container {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #fe7a23;
+            display: none;
+        }
+
+        .mission-form-container .form-title {
+            color: #603913;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+        }
+
+        .mission-form-container .form-title i {
+            color: #fe7a23;
+        }
+
+        .mission-form-container .form-group {
+            margin-bottom: 14px;
+        }
+
+        .mission-form-container label {
+            font-weight: 600;
+            font-size: 13px;
+            display: block;
+            margin-bottom: 4px;
+            color: #603913;
+        }
+
+        .mission-form-container label .required {
+            color: #e74c3c;
+        }
+
+        .mission-form-container input,
+        .mission-form-container textarea,
+        .mission-form-container select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e8dfd1;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: 0.3s;
+            background: #faf8f5;
+        }
+
+        .mission-form-container input:focus,
+        .mission-form-container textarea:focus,
+        .mission-form-container select:focus {
+            outline: none;
+            border-color: #fe7a23;
+            box-shadow: 0 0 0 4px rgba(254,122,35,0.1);
+            background: #fff;
+        }
+
+        .mission-form-container .gps-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mission-form-container .gps-row input {
+            flex: 1;
+        }
+
+        .mission-form-container .gps-btn {
+            padding: 10px 16px;
+            background: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 13px;
+            transition: 0.3s;
+        }
+
+        .mission-form-container .gps-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .mission-form-container .gps-status {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+            min-height: 20px;
+        }
+
+        .mission-form-container .gps-status.success { color: #2ecc71; }
+        .mission-form-container .gps-status.error { color: #e74c3c; }
+        .mission-form-container .gps-status.loading { color: #f39c12; }
+
+        .mission-form-container .photo-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .mission-form-container .photo-buttons button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 15px;
+            transition: 0.3s;
+            min-width: 120px;
+        }
+
+        .mission-form-container .photo-buttons button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .mission-form-container .photo-buttons button:active {
+            transform: scale(0.95);
+        }
+
+        .mission-form-container .photo-buttons .camera-btn {
+            background: #2ecc71;
+            color: #fff;
+        }
+
+        .mission-form-container .photo-buttons .camera-btn:hover {
+            background: #27ae60;
+        }
+
+        .mission-form-container .photo-buttons .gallery-btn {
+            background: #3498db;
+            color: #fff;
+        }
+
+        .mission-form-container .photo-buttons .gallery-btn:hover {
+            background: #2980b9;
+        }
+
+        #missionPhoto {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e8dfd1;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-top: 8px;
+            background: #faf8f5;
+            cursor: pointer;
+        }
+
+        #missionPhoto:hover {
+            border-color: #fe7a23;
+            background: #fef8f0;
+        }
+
+        #cameraContainer {
+            display: none;
+            margin-bottom: 10px;
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #fe7a23;
+        }
+
+        #cameraContainer video {
+            width: 100%;
+            display: block;
+            max-height: 400px;
+            object-fit: cover;
+            background: #000;
+        }
+
+        #cameraContainer .camera-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 16px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        #cameraContainer .camera-overlay button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.3s;
+            min-width: 120px;
+        }
+
+        #cameraContainer .camera-overlay button:hover {
+            transform: scale(1.05);
+        }
+
+        #cameraContainer .camera-overlay .capture-btn {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        #cameraContainer .camera-overlay .capture-btn:hover {
+            background: #c0392b;
+        }
+
+        #cameraContainer .camera-overlay .close-camera-btn {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        #cameraContainer .camera-overlay .close-camera-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        #cameraContainer .camera-status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+        }
+
+        #cameraContainer .camera-status .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #2ecc71;
+            border-radius: 50%;
+            animation: pulse-dot 1s ease-in-out infinite;
+            margin-right: 6px;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.8); }
+        }
+
+        .mission-form-container .photo-preview {
+            margin-top: 10px;
+            display: none;
+            position: relative;
+        }
+
+        .mission-form-container .photo-preview img {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #fe7a23;
+        }
+
+        .mission-form-container .photo-preview .remove-photo {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(231,76,60,0.9);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+
+        .mission-form-container .photo-preview .remove-photo:hover {
+            transform: scale(1.1);
+        }
+
+        /* ===== VIDEO RECORDING ===== */
+        .video-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .video-buttons button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 15px;
+            transition: 0.3s;
+            min-width: 120px;
+        }
+
+        .video-buttons button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .video-buttons button:active {
+            transform: scale(0.95);
+        }
+
+        .video-buttons .record-btn {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .video-buttons .record-btn:hover {
+            background: #c0392b;
+        }
+
+        .video-buttons .record-btn.recording {
+            animation: pulse-record 1s ease-in-out infinite;
+        }
+
+        .video-buttons .stop-btn {
+            background: #95a5a6;
+            color: #fff;
+            display: none;
+        }
+
+        .video-buttons .stop-btn:hover {
+            background: #7f8c8d;
+        }
+
+        @keyframes pulse-record {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
+        #videoPreviewContainer {
+            display: none;
+            margin-top: 10px;
+            position: relative;
+        }
+
+        #videoPreviewContainer video {
+            width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            border: 2px solid #9b59b6;
+            background: #000;
+        }
+
+        #videoPreviewContainer .remove-video-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(231,76,60,0.9);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+
+        #videoPreviewContainer .remove-video-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .video-status {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+            min-height: 20px;
+        }
+
+        .video-status.recording {
+            color: #e74c3c;
+        }
+
+        .video-status.recorded {
+            color: #2ecc71;
+        }
+
+        .mission-form-container .submit-mission-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #fe7a23, #f58d48);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .mission-form-container .submit-mission-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(254,122,35,0.3);
+        }
+
+        .mission-form-container .submit-mission-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .mission-form-container .submit-mission-btn .spinner {
+            display: none;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .mission-form-container .progress-container {
+            margin-top: 10px;
+            display: none;
+        }
+
+        .mission-form-container .progress-bar {
+            height: 6px;
+            background: #e8dfd1;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .mission-form-container .progress-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fe7a23, #f58d48);
+            width: 0%;
+            transition: width 0.4s ease;
+            border-radius: 20px;
+        }
+
+        .mission-form-container .progress-text {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .mission-map-container {
+            background: #e8dfd1;
+            border-radius: 8px;
+            height: 450px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .mission-map-container #missionMap {
+            width: 100%;
+            height: 100%;
+        }
+
+        .mission-locations {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .mission-location-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 14px 16px;
+            border-left: 4px solid #fe7a23;
+            box-shadow: 0 2px 2px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .mission-location-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+
+        .mission-location-card .location-name {
+            font-weight: 700;
+            color: #603913;
+            font-size: 15px;
+        }
+
+        .mission-location-card .location-details {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .mission-location-card .location-date {
+            font-size: 11px;
+            color: #fe7a23;
+            font-weight: 600;
+        }
+
+        .mission-location-card .mission-thumb {
+            margin: 4px 0;
+            max-height: 80px;
+            overflow: hidden;
+            border-radius: 4px;
+            border: 1px solid #e8dfd1;
+        }
+
+        .mission-location-card .mission-thumb img {
+            width: 100%;
+            object-fit: cover;
+            max-height: 80px;
+        }
+
+        .mission-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin: 16px 0;
+        }
+
+        .mission-stats .stat-card {
+            background: linear-gradient(135deg, #603913, #fe7a23);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            color: #fff;
+        }
+
+        .mission-stats .stat-card .stat-label {
+            font-size: 10px;
+            opacity: 0.7;
+        }
+
+        .mission-stats .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f58d48;
+        }
+
+        .mission-popup .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .mission-popup .leaflet-popup-content {
+            margin: 12px 16px;
+            min-width: 200px;
+            max-width: 300px;
+        }
+
+        .mission-popup .leaflet-popup-tip {
+            background: #fff;
+        }
+
+        @media (max-width: 600px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+            .access-input-group {
+                flex-direction: column;
+            }
+            .access-input-group button {
+                width: 100%;
+            }
+            .mission-form-container .gps-row {
+                flex-wrap: wrap;
+            }
+            .mission-form-container .gps-btn {
+                width: 100%;
+            }
+            .mission-form-container .photo-buttons {
+                flex-direction: column;
+            }
+            .mission-form-container .photo-buttons button {
+                width: 100%;
+            }
+            #cameraContainer .camera-overlay {
+                flex-direction: column;
+                align-items: center;
+            }
+            #cameraContainer .camera-overlay button {
+                width: 100%;
+            }
+            .video-buttons {
+                flex-direction: column;
+            }
+            .video-buttons button {
+                width: 100%;
+            }
+            .mission-stats {
+                grid-template-columns: 1fr;
+            }
+            .mission-map-container {
+                height: 300px;
+            }
+            .mission-locations {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #baa898;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #e8dfd1;
+        }
+
+        .footer a {
+            color: #fe7a23;
+            text-decoration: none;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(26,42,58,0.95);
+            color: #f5e6c8;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            border-left: 4px solid #fe7a23;
+            max-width: 380px;
+        }
+
+        .toast.show { display: flex; animation: toastIn 0.35s ease; }
+        .toast.error { border-left-color: #e74c3c; }
+        .toast .toast-icon { font-size: 18px; color: #fe7a23; }
+        .toast.error .toast-icon { color: #e74c3c; }
+
+        @keyframes toastIn {
+            0% { opacity: 0; transform: translateY(15px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .toast .close-toast {
+            background: none;
+            border: none;
+            color: #8a7a6a;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 8px;
+        }
+
+        .camera-active {
+            animation: pulse-camera 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-camera {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <div class="header">
+            <div class="logo">⛪</div>
+            <h1>📋 RIPOTI UMISHENI</h1>
+            <p>PHID - Potters House International Dar es Salaam</p>
+            <p style="font-size: 12px; opacity: 0.7; margin-top: 4px;">
+                <i class="fas fa-mobile-alt"></i> Chagua picha au rekodi video fupi
+            </p>
+        </div>
+
+        <!-- ACCESS CODE -->
+        <div class="access-section" id="accessSection">
+            <div class="access-title">
+                <i class="fas fa-key"></i>
+                Weka Msimbo wa Uidhinishaji
+            </div>
+            <div class="access-subtitle">
+                <i class="fas fa-info-circle"></i>
+                Msimbo unatolewa na viongozi wa kanisa kwa wanaumisheni pekee
+            </div>
+
+            <div class="access-input-group">
+                <input type="password" id="accessCode" placeholder="Weka msimbo..." maxlength="20" autofocus>
+                <button onclick="verifyAccess()">
+                    <i class="fas fa-unlock"></i> Fungua
+                </button>
+            </div>
+
+            <div class="access-error" id="accessError">
+                <i class="fas fa-exclamation-circle"></i>
+                <span id="errorMessage">Msimbo si sahihi. Jaribu tena.</span>
+            </div>
+
+            <div class="access-success" id="accessSuccess">
+                <i class="fas fa-check-circle"></i>
+                <span>Msimbo sahihi! Unaweza kuendelea.</span>
+            </div>
+
+            <div class="access-attempts">
+                <i class="fas fa-hourglass-half"></i>
+                Majaribio yaliyobaki: <span id="attemptsLeft">5</span>
+            </div>
+        </div>
+
+        <!-- MISSION FORM -->
+        <div class="mission-form-container" id="missionFormContainer">
+            <div class="form-title">
+                <i class="fas fa-camera"></i>
+                Ripoti Umisheni (Picha + Video + GPS)
+                <span style="font-size:11px;background:#e74c3c;color:#fff;padding:2px 10px;border-radius:20px;margin-left:auto;">
+                    <i class="fas fa-mobile-alt"></i> SIMU / PC
+                </span>
+            </div>
+
+            <form id="missionReportForm" onsubmit="submitMissionReport(event)" enctype="multipart/form-data">
+
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-map-marker-alt" style="color:#fe7a23;"></i>
+                        Jina la Eneo <span class="required">*</span>
+                    </label>
+                    <input type="text" id="missionLocationName" required placeholder="Ej. Kigamboni, Mbagala, Ubungo...">
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-satellite" style="color:#3498db;"></i>
+                            Koordinati (GPS) <span class="required">*</span>
+                        </label>
+                        <div class="gps-row">
+                            <input type="text" id="missionLat" placeholder="Lat" required>
+                            <input type="text" id="missionLng" placeholder="Lng" required>
+                            <button type="button" class="gps-btn" onclick="captureGPS()">
+                                <i class="fas fa-satellite-dish"></i> GPS
+                            </button>
+                        </div>
+                        <div class="gps-status" id="gpsStatus">
+                            <i class="fas fa-info-circle"></i>
+                            Bonyeza "GPS" kuchukua eneo lako la sasa
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-users" style="color:#2ecc71;"></i>
+                            Idadi ya Watu
+                        </label>
+                        <input type="number" id="missionPeopleCount" value="0" min="0">
+                    </div>
+                </div>
+
+                <!-- PICHA -->
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-camera" style="color:#e74c3c;"></i>
+                        Picha ya Eneo
+                        <span style="font-size:11px;color:#888;font-weight:normal;">
+                            (Chagua picha kutoka simu au kompyuta)
+                        </span>
+                    </label>
+
+                    <div class="photo-buttons">
+                        <button type="button" class="camera-btn" onclick="openCamera()">
+                            <i class="fas fa-camera"></i> 📸 Piga Picha
+                        </button>
+                        <button type="button" class="gallery-btn" onclick="choosePhoto()">
+                            <i class="fas fa-images"></i> 🖼️ Chagua Picha
+                        </button>
+                    </div>
+
+                    <input type="file" id="missionPhoto" accept="image/*" capture="environment">
+
+                    <div id="cameraContainer">
+                        <div class="camera-status">
+                            <span class="dot"></span> LIVE
+                        </div>
+                        <video id="cameraVideo" autoplay playsinline></video>
+                        <div class="camera-overlay">
+                            <button class="capture-btn" onclick="capturePhoto()">
+                                <i class="fas fa-camera"></i> 📸 CHUKUA PICHA
+                            </button>
+                            <button class="close-camera-btn" onclick="closeCamera()">
+                                <i class="fas fa-times"></i> Funga
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="photo-preview" id="photoPreview">
+                        <img id="previewImage" alt="Picha ya eneo">
+                        <button type="button" class="remove-photo" onclick="removeMissionPhoto()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- VIDEO RECORDING -->
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-video" style="color:#9b59b6;"></i>
+                        Rekodi Video Fupi
+                        <span style="font-size:11px;color:#888;font-weight:normal;">
+                            (sekunde 5, inasaidia sana)
+                        </span>
+                    </label>
+
+                    <div class="video-buttons">
+                        <button type="button" class="record-btn" id="startVideoBtn">
+                            <i class="fas fa-circle"></i> 🔴 REKODI VIDEO
+                        </button>
+                        <button type="button" class="stop-btn" id="stopVideoBtn">
+                            <i class="fas fa-stop"></i> ⏹️ SIMAMA
+                        </button>
+                    </div>
+
+                    <div id="videoPreviewContainer">
+                        <video id="videoPreview" controls></video>
+                        <button type="button" class="remove-video-btn" onclick="removeVideo()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="video-status" id="videoStatus">
+                        <i class="fas fa-info-circle"></i> Bonyeza "REKODI VIDEO" kuanza kurekodi
+                    </div>
+
+                    <input type="hidden" id="videoData" value="">
+                    <input type="hidden" id="videoType" value="">
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-calendar" style="color:#f39c12;"></i>
+                            Tarehe <span class="required">*</span>
+                        </label>
+                        <input type="date" id="missionDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-pencil-alt" style="color:#9b59b6;"></i>
+                            Maelezo (hiari)
+                        </label>
+                        <input type="text" id="missionDescription" placeholder="Maelezo mafupi...">
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-mission-btn" id="submitMissionBtn">
+                    <span class="spinner" id="missionSpinner"><i class="fas fa-spinner"></i></span>
+                    <span id="missionSubmitText">
+                        <i class="fas fa-cloud-upload-alt"></i> Hifadhi Umisheni
+                    </span>
+                </button>
+
+                <div class="progress-container" id="missionProgress">
+                    <div class="progress-bar">
+                        <div class="fill" id="missionProgressFill"></div>
+                    </div>
+                    <div class="progress-text" id="missionProgressText">Inapakia...</div>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- MISSION MAP -->
+        <div class="mission-map-container">
+            <div id="missionMap"></div>
+        </div>
+
+        <!-- MISSION STATS -->
+        <div class="mission-stats">
+            <div class="stat-card">
+                <div class="stat-label">Jumla ya Maeneo</div>
+                <div class="stat-value" id="totalLocations">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Miji Imefikiwa</div>
+                <div class="stat-value" id="totalCities">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Watu Wamefikiwa</div>
+                <div class="stat-value" id="totalPeople">0</div>
+            </div>
+        </div>
+
+        <!-- MISSION LOCATIONS LIST -->
+        <h4 style="color:#603913;margin:20px 0 12px 0;font-size:16px;">
+            <i class="fas fa-map-marker-alt" style="color:#fe7a23;"></i> Maeneo ya Umisheni
+        </h4>
+        <div class="mission-locations" id="missionLocationsList"></div>
+
+        <div class="footer">
+            <i class="fas fa-shield-alt" style="color:#fe7a23;"></i>
+            Taarifa zako zitatumika kwa ajili ya ramani ya umisheni ya kanisa
+            <br>
+            <span style="font-size: 10px; color: #ddd;">
+                PHID - Potters House International Dar es Salaam
+            </span>
+        </div>
+
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle toast-icon"></i>
+        <span id="toastMsg">Data saved!</span>
+        <button class="close-toast" onclick="hideToast()">&times;</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // =========================================================
+        //   CONFIG
+        // =========================================================
+
+        const VALID_CODES = ['PHID-2025', 'MISSION-2025', 'UMISHENI2025', 'PASTOR-2025'];
+        let accessAttempts = 5;
+        let isAccessGranted = false;
+        const API_URL = 'http://localhost:3000/api/missions';
+        let missionData = [];
+        let isSubmitting = false;
+
+        // =========================================================
+        //   TOAST
+        // =========================================================
+        function showToast(msg, icon = 'fa-check-circle', isError = false) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.querySelector('.toast-icon').className = 'fas ' + icon + ' toast-icon';
+            toast.classList.toggle('error', isError);
+            toast.classList.add('show');
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => toast.classList.remove('show'), 5000);
+        }
+
+        function hideToast() {
+            document.getElementById('toast').classList.remove('show');
+        }
+
+        // =========================================================
+        //   ACCESS CODE
+        // =========================================================
+        function verifyAccess() {
+            const codeInput = document.getElementById('accessCode');
+            const code = codeInput.value.trim();
+
+            const errorEl = document.getElementById('accessError');
+            const successEl = document.getElementById('accessSuccess');
+            const attemptsLeft = document.getElementById('attemptsLeft');
+
+            if (VALID_CODES.includes(code)) {
+                isAccessGranted = true;
+                successEl.classList.add('show');
+                errorEl.classList.remove('show');
+
+                document.getElementById('missionFormContainer').style.display = 'block';
+                document.getElementById('accessSection').classList.add('disabled');
+
+                showToast('✅ Msimbo sahihi! Unaweza kuanza.', 'fa-check-circle');
+
+                accessAttempts = 5;
+                attemptsLeft.textContent = accessAttempts;
+
+                setTimeout(loadMissionsFromDB, 1000);
+
+            } else {
+                accessAttempts--;
+                attemptsLeft.textContent = accessAttempts;
+
+                errorEl.classList.add('show');
+                document.getElementById('errorMessage').textContent =
+                    'Msimbo si sahihi. Majaribio yaliyobaki: ' + accessAttempts;
+
+                if (accessAttempts <= 0) {
+                    document.getElementById('accessCode').disabled = true;
+                    document.querySelector('.access-input-group button').disabled = true;
+                    errorEl.innerHTML = `
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>❌ Umejaribu mara nyingi sana. Tafadhali wasiliana na kiongozi wa kanisa.</span>
+                    `;
+                    document.querySelector('.access-attempts').innerHTML =
+                        '<i class="fas fa-lock" style="color:#e74c3c;"></i> Imefungwa. Wasiliana na viongozi.';
+                    showToast('❌ Msimbo umeisha. Wasiliana na viongozi.', 'fa-exclamation-triangle', true);
+                } else {
+                    showToast('❌ Msimbo si sahihi. Jaribu tena.', 'fa-exclamation-triangle', true);
+                    codeInput.value = '';
+                    codeInput.focus();
+                }
+            }
+        }
+
+        document.getElementById('accessCode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                verifyAccess();
+            }
+        });
+
+        // =========================================================
+        //   LIVE CAMERA (PICHA)
+        // =========================================================
+
+        let cameraStream = null;
+        const cameraContainer = document.getElementById('cameraContainer');
+        const cameraVideo = document.getElementById('cameraVideo');
+
+        async function openCamera() {
+            if (!isAccessGranted) {
+                showToast('⚠️ Tafadhali weka msimbo kwanza', 'fa-exclamation-triangle', true);
+                return;
+            }
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                });
+
+                cameraVideo.srcObject = cameraStream;
+                cameraContainer.style.display = 'block';
+                cameraContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showToast('📸 Camera imefunguliwa! Bonyeza "CHUKUA PICHA"', 'fa-camera');
+
+            } catch (error) {
+                console.error('Camera error:', error);
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    cameraVideo.srcObject = cameraStream;
+                    cameraContainer.style.display = 'block';
+                    showToast('📸 Camera imefunguliwa!', 'fa-camera');
+                } catch (error2) {
+                    showToast('❌ Camera haipatikani. Tumia "Chagua Picha"', 'fa-exclamation-triangle', true);
+                    document.getElementById('missionPhoto').click();
+                }
+            }
+        }
+
+        function capturePhoto() {
+            if (!cameraStream) {
+                showToast('⚠️ Tafadhali fungua camera kwanza', 'fa-exclamation-triangle', true);
+                return;
+            }
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = cameraVideo.videoWidth || 640;
+                canvas.height = cameraVideo.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob(function(blob) {
+                    const file = new File([blob], 'photo_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+
+                    const input = document.getElementById('missionPhoto');
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    input.files = dataTransfer.files;
+
+                    console.log('📸 CAPTURED - File name:', file.name);
+                    console.log('📸 CAPTURED - File size:', file.size);
+
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        document.getElementById('previewImage').src = event.target.result;
+                        document.getElementById('photoPreview').style.display = 'block';
+                        showToast('✅ Picha imechukuliwa!', 'fa-check-circle');
+                    };
+                    reader.readAsDataURL(file);
+
+                    closeCamera();
+                }, 'image/jpeg', 0.9);
+
+            } catch (error) {
+                console.error('Capture error:', error);
+                showToast('❌ Tatizo la kuchukua picha', 'fa-exclamation-triangle', true);
+            }
+        }
+
+        function closeCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            cameraVideo.srcObject = null;
+            cameraContainer.style.display = 'none';
+        }
+
+        function choosePhoto() {
+            if (!isAccessGranted) {
+                showToast('⚠️ Tafadhali weka msimbo kwanza', 'fa-exclamation-triangle', true);
+                return;
+            }
+
+            closeCamera();
+
+            const input = document.getElementById('missionPhoto');
+            input.removeAttribute('capture');
+            input.setAttribute('accept', 'image/*');
+            input.click();
+        }
+
+        document.getElementById('missionPhoto').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            console.log('📸 FILE SELECTED - Input changed:', file);
+            
+            if (file) {
+                if (!file.type.startsWith('image/')) {
+                    showToast('❌ Tafadhali chagua picha tu!', 'fa-exclamation-triangle', true);
+                    this.value = '';
+                    return;
+                }
+
+                console.log('📸 FILE SELECTED - Name:', file.name);
+                console.log('📸 FILE SELECTED - Size:', file.size);
+                console.log('📸 FILE SELECTED - Type:', file.type);
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    document.getElementById('previewImage').src = event.target.result;
+                    document.getElementById('photoPreview').style.display = 'block';
+                    showToast('✅ Picha imepakiwa!', 'fa-check-circle');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function removeMissionPhoto() {
+            document.getElementById('missionPhoto').value = '';
+            document.getElementById('photoPreview').style.display = 'none';
+            console.log('📸 Photo removed');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeCamera();
+            }
+        });
+
+        // =========================================================
+        //   VIDEO RECORDING
+        // =========================================================
+
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let videoStream = null;
+        let videoTimer = null;
+        let recordingSeconds = 0;
+        let isRecording = false;
+
+        const startVideoBtn = document.getElementById('startVideoBtn');
+        const stopVideoBtn = document.getElementById('stopVideoBtn');
+        const videoPreview = document.getElementById('videoPreview');
+        const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+        const videoStatus = document.getElementById('videoStatus');
+        const videoDataInput = document.getElementById('videoData');
+        const videoTypeInput = document.getElementById('videoType');
+
+        // START RECORDING
+        startVideoBtn.addEventListener('click', async function() {
+            if (!isAccessGranted) {
+                showToast('⚠️ Tafadhali weka msimbo kwanza', 'fa-exclamation-triangle', true);
+                return;
+            }
+
+            if (isRecording) return;
+
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: true
+                });
+
+                mediaRecorder = new MediaRecorder(videoStream, {
+                    mimeType: 'video/mp4'
+                });
+
+                recordedChunks = [];
+
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = function() {
+                    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const base64 = event.target.result.split(',')[1];
+                        videoDataInput.value = base64;
+                        videoTypeInput.value = 'video/mp4';
+                        
+                        const videoUrl = URL.createObjectURL(blob);
+                        videoPreview.src = videoUrl;
+                        videoPreviewContainer.style.display = 'block';
+                        
+                        showToast('✅ Video imerekodiwa!', 'fa-check-circle');
+                        videoStatus.className = 'video-status recorded';
+                        videoStatus.innerHTML = '<i class="fas fa-check-circle"></i> Video imerekodiwa (' + recordingSeconds + ' sekunde)';
+                    };
+                    reader.readAsDataURL(blob);
+                    
+                    if (videoStream) {
+                        videoStream.getTracks().forEach(track => track.stop());
+                        videoStream = null;
+                    }
+                    
+                    startVideoBtn.style.display = 'block';
+                    startVideoBtn.classList.remove('recording');
+                    stopVideoBtn.style.display = 'none';
+                    clearInterval(videoTimer);
+                    recordingSeconds = 0;
+                    isRecording = false;
+                };
+
+                mediaRecorder.start(1000);
+                startVideoBtn.style.display = 'none';
+                stopVideoBtn.style.display = 'block';
+                isRecording = true;
+                videoStatus.className = 'video-status recording';
+                videoStatus.innerHTML = '<i class="fas fa-circle" style="color:#e74c3c; animation: pulse 1s infinite;"></i> Inarekodi... 0s';
+                
+                recordingSeconds = 0;
+                videoTimer = setInterval(() => {
+                    recordingSeconds++;
+                    videoStatus.innerHTML = '<i class="fas fa-circle" style="color:#e74c3c; animation: pulse 1s infinite;"></i> Inarekodi... ' + recordingSeconds + 's';
+                    
+                    if (recordingSeconds >= 5) {
+                        stopRecording();
+                        showToast('⏹️ Video imesimama (sekunde 5)', 'fa-info-circle');
+                    }
+                }, 1000);
+
+                showToast('🔴 Inarekodi...', 'fa-circle');
+
+            } catch (error) {
+                console.error('Video recording error:', error);
+                showToast('❌ Kamera haipatikani. Hakikisha umeruhusu kamera.', 'fa-exclamation-triangle', true);
+                startVideoBtn.style.display = 'block';
+                startVideoBtn.classList.remove('recording');
+                stopVideoBtn.style.display = 'none';
+                isRecording = false;
+            }
+        });
+
+        // STOP RECORDING
+        stopVideoBtn.addEventListener('click', stopRecording);
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                clearInterval(videoTimer);
+                recordingSeconds = 0;
+                isRecording = false;
+            }
+        }
+
+        // REMOVE VIDEO
+        function removeVideo() {
+            if (isSubmitting) {
+                console.log('⚠️ Video inasubmit, usiondoe!');
+                return;
+            }
+            
+            videoDataInput.value = '';
+            videoTypeInput.value = '';
+            videoPreview.src = '';
+            videoPreviewContainer.style.display = 'none';
+            videoStatus.className = 'video-status';
+            videoStatus.innerHTML = '<i class="fas fa-info-circle"></i> Video imeondolewa';
+            showToast('🗑️ Video imeondolewa', 'fa-trash');
+            
+            if (isRecording) {
+                stopRecording();
+            }
+            startVideoBtn.style.display = 'block';
+            startVideoBtn.classList.remove('recording');
+            stopVideoBtn.style.display = 'none';
+        }
+
+        // =========================================================
+        //   GPS
+        // =========================================================
+        function captureGPS() {
+            if (!isAccessGranted) {
+                showToast('⚠️ Tafadhali weka msimbo kwanza', 'fa-exclamation-triangle', true);
+                return;
+            }
+
+            const statusEl = document.getElementById('gpsStatus');
+            statusEl.className = 'gps-status loading';
+            statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Inatafuta GPS... Tafadhali subiri...';
+
+            if (!navigator.geolocation) {
+                statusEl.className = 'gps-status error';
+                statusEl.innerHTML = '❌ GPS haipatikani kwenye kifaa chako';
+                showToast('GPS haipatikani', 'fa-exclamation-triangle', true);
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude.toFixed(6);
+                    const lng = position.coords.longitude.toFixed(6);
+
+                    document.getElementById('missionLat').value = lat;
+                    document.getElementById('missionLng').value = lng;
+
+                    statusEl.className = 'gps-status success';
+                    statusEl.innerHTML = '✅ GPS imefanikiwa! Lat: ' + lat + ', Lng: ' + lng;
+                    showToast('✅ Coordinates zimechukuliwa!', 'fa-check-circle');
+                },
+                function(error) {
+                    let msg = '❌ GPS imeshindwa: ';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            msg += 'Ruhusu GPS kwenye browser yako. Nenda kwenye mipangilio ya simu → Ruhusa → Ruhusu eneo.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            msg += 'Hakuna ishara ya GPS. Nje ya nyumba au mahali palipo wazi.';
+                            break;
+                        case error.TIMEOUT:
+                            msg += 'Muda umeisha. Jaribu tena au weka coordinates manually.';
+                            break;
+                        default:
+                            msg += 'Tatizo lisilojulikana. Weka coordinates manually.';
+                    }
+                    statusEl.className = 'gps-status error';
+                    statusEl.innerHTML = msg;
+                    showToast('❌ GPS imeshindwa', 'fa-exclamation-triangle', true);
+                }, {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        // =========================================================
+        //   LOAD MISSIONS FROM DATABASE
+        // =========================================================
+        async function loadMissionsFromDB() {
+            try {
+                const response = await fetch(API_URL);
+                if (response.ok) {
+                    missionData = await response.json();
+                    console.log('📥 Missions loaded:', missionData.length);
+                    initMissionMap();
+                } else {
+                    console.error('Failed to load missions');
+                }
+            } catch (error) {
+                console.error('Error loading missions:', error);
+            }
+        }
+
+        // =========================================================
+        //   MISSION MAP
+        // =========================================================
+        let missionMap = null;
+
+        function initMissionMap() {
+            const container = document.getElementById('missionMap');
+            if (!container) return;
+            
+            if (missionMap) {
+                missionMap.invalidateSize();
+                updateMissionMap();
+                return;
+            }
+            
+            missionMap = L.map('missionMap').setView([-6.5, 35.0], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(missionMap);
+            
+            updateMissionMap();
+        }
+
+        function createPopupContent(location) {
+            let imageHtml = '';
+            let videoHtml = '';
+            
+            // PICHA
+            if (location.image_base64) {
+                const imageSrc = `data:${location.image_type || 'image/jpeg'};base64,${location.image_base64}`;
+                imageHtml = `
+                    <div style="margin:8px 0;border-radius:8px;overflow:hidden;border:2px solid #fe7a23;background:#f5f0eb;">
+                        <img src="${imageSrc}" 
+                             style="width:100%;max-height:200px;min-height:120px;object-fit:cover;display:block;" 
+                             alt="${location.name}"
+                             onerror="this.parentElement.innerHTML='<div style=\\'padding:30px;text-align:center;background:#f0ebe3;color:#999;\\'><i class=\\'fas fa-image\\' style=\\'font-size:36px;\\'></i><p style=\\'margin:8px 0 0 0;font-size:12px;\\'>Picha haipatikani</p></div>'"
+                        />
+                        <div style="position:relative;margin-top:-20px;text-align:right;padding-right:8px;">
+                            <span style="background:rgba(0,0,0,0.6);color:#fff;padding:2px 10px;border-radius:12px;font-size:10px;">
+                                <i class="fas fa-camera"></i> PHOTO
+                            </span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                imageHtml = `
+                    <div style="margin:8px 0;padding:30px 20px;text-align:center;background:#f0ebe3;border-radius:8px;border:2px dashed #d4c4a8;">
+                        <i class="fas fa-image" style="font-size:36px;color:#baa898;"></i>
+                        <p style="margin:6px 0 0 0;font-size:12px;color:#999;">Hakuna picha</p>
+                    </div>
+                `;
+            }
+
+            // VIDEO
+            if (location.video_base64) {
+                const videoSrc = `data:${location.video_type || 'video/mp4'};base64,${location.video_base64}`;
+                videoHtml = `
+                    <div style="margin:8px 0;border-radius:8px;overflow:hidden;border:2px solid #9b59b6;background:#000;">
+                        <video controls style="width:100%;max-height:150px;display:block;">
+                            <source src="${videoSrc}" type="${location.video_type || 'video/mp4'}">
+                            Browser yako haisupport video.
+                        </video>
+                        <div style="position:relative;margin-top:-20px;text-align:right;padding-right:8px;">
+                            <span style="background:rgba(0,0,0,0.6);color:#fff;padding:2px 10px;border-radius:12px;font-size:10px;">
+                                <i class="fas fa-video"></i> VIDEO
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const dateFormatted = location.date ? formatDate(location.date) : 'Tarehe haijulikani';
+            
+            return `
+                <div style="max-width:280px;font-family:'Segoe UI',sans-serif;min-width:200px;">
+                    <h4 style="color:#603913;margin:0 0 4px 0;font-size:16px;border-bottom:2px solid #fe7a23;padding-bottom:6px;display:flex;align-items:center;gap:6px;">
+                        <i class="fas fa-map-pin" style="color:#fe7a23;font-size:14px;"></i>
+                        ${location.name}
+                    </h4>
+                    
+                    ${imageHtml}
+                    ${videoHtml}
+                    
+                    <div style="margin:6px 0;">
+                        ${location.description ? `<p style="font-size:13px;color:#5a4a3a;margin:4px 0;line-height:1.5;">${location.description}</p>` : ''}
+                    </div>
+                    
+                    <div style="font-size:12px;color:#888;margin-top:6px;border-top:1px solid #f0ebe3;padding-top:6px;">
+                        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+                            <span><i class="fas fa-calendar-alt" style="color:#fe7a23;width:16px;"></i> ${dateFormatted}</span>
+                            <span><i class="fas fa-users" style="color:#fe7a23;width:16px;"></i> ${location.people_reached || 0} wamefikiwa</span>
+                        </div>
+                        ${location.city ? `<div style="margin-top:2px;"><i class="fas fa-city" style="color:#fe7a23;width:16px;"></i> ${location.city}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateMissionMap() {
+            if (!missionMap) return;
+            
+            missionMap.eachLayer(function(layer) {
+                if (layer instanceof L.Marker) {
+                    missionMap.removeLayer(layer);
+                }
+            });
+            
+            if (!missionData || missionData.length === 0) {
+                return;
+            }
+            
+            missionData.forEach(location => {
+                const popupContent = createPopupContent(location);
+                
+                const marker = L.marker([parseFloat(location.lat), parseFloat(location.lng)])
+                    .addTo(missionMap)
+                    .bindPopup(popupContent, { maxWidth: 320, className: 'mission-popup' });
+                
+                const hasImage = location.image_base64 ? true : false;
+                const hasVideo = location.video_base64 ? true : false;
+                
+                let iconHtml = `<div style="background:#fe7a23;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.3);font-size:16px;position:relative;">✝`;
+                
+                if (hasImage) {
+                    iconHtml += `<span style="position:absolute;bottom:-2px;right:-2px;background:#2ecc71;width:12px;height:12px;border-radius:50%;border:2px solid #fff;"></span>`;
+                }
+                if (hasVideo) {
+                    iconHtml += `<span style="position:absolute;bottom:-2px;left:-2px;background:#9b59b6;width:12px;height:12px;border-radius:50%;border:2px solid #fff;font-size:6px;display:flex;align-items:center;justify-content:center;">▶</span>`;
+                }
+                iconHtml += `</div>`;
+                
+                const icon = L.divIcon({
+                    className: 'custom-marker',
+                    html: iconHtml,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+                marker.setIcon(icon);
+            });
+            
+            if (missionData.length > 0) {
+                const bounds = L.latLngBounds(missionData.map(m => [parseFloat(m.lat), parseFloat(m.lng)]));
+                missionMap.fitBounds(bounds, { padding: [50, 50] });
+            }
+            
+            updateStats();
+        }
+
+        function updateStats() {
+            if (!missionData) return;
+            
+            document.getElementById('totalLocations').textContent = missionData.length;
+            
+            const cities = [...new Set(missionData.map(m => m.city || '').filter(c => c))];
+            document.getElementById('totalCities').textContent = cities.length || 0;
+            
+            const totalPeople = missionData.reduce((sum, m) => sum + (parseInt(m.people_reached) || 0), 0);
+            document.getElementById('totalPeople').textContent = totalPeople;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr + 'T00:00:00');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ago', 'Sep', 'Okt', 'Nov', 'Des'];
+            return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+        }
+
+        // =========================================================
+        //   SUBMIT MISSION - ILIYOSAHIHISHWA (VIDEO KAMA BLOB)
+        // =========================================================
+        async function submitMissionReport(e) {
+            e.preventDefault();
+
+            if (!isAccessGranted) {
+                showToast('⚠️ Tafadhali weka msimbo kwanza', 'fa-exclamation-triangle', true);
+                return;
+            }
+
+            isSubmitting = true;
+
+            const name = document.getElementById('missionLocationName').value.trim();
+            const lat = document.getElementById('missionLat').value.trim();
+            const lng = document.getElementById('missionLng').value.trim();
+            const date = document.getElementById('missionDate').value;
+            const people = parseInt(document.getElementById('missionPeopleCount').value) || 0;
+            const description = document.getElementById('missionDescription').value.trim();
+            
+            const photoFile = document.getElementById('missionPhoto').files[0];
+            
+            // ===== VIDEO - CHUKUA BASE64 KUTOKA HIDDEN INPUT =====
+            const videoBase64 = document.getElementById('videoData').value;
+            const videoType = document.getElementById('videoType').value;
+
+            console.log('📸 ===== SUBMIT =====');
+            console.log('📸 Photo file:', photoFile ? photoFile.name : 'NO PHOTO');
+            console.log('🎥 Video:', videoBase64 ? 'YES (' + videoBase64.length + ' chars)' : 'NO');
+
+            if (!name) {
+                showToast('⚠️ Tafadhali weka jina la eneo', 'fa-exclamation-triangle', true);
+                isSubmitting = false;
+                return;
+            }
+
+            if (!lat || !lng) {
+                showToast('⚠️ Tafadhali chukua GPS au weka coordinates', 'fa-exclamation-triangle', true);
+                isSubmitting = false;
+                return;
+            }
+
+            if (!date) {
+                showToast('⚠️ Tafadhali weka tarehe', 'fa-exclamation-triangle', true);
+                isSubmitting = false;
+                return;
+            }
+
+            // ===== RUHUSU PICHA AU VIDEO =====
+            if (!photoFile && !videoBase64) {
+                showToast('⚠️ Tafadhali chagua picha au rekodi video', 'fa-exclamation-triangle', true);
+                isSubmitting = false;
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitMissionBtn');
+            const spinner = document.getElementById('missionSpinner');
+            const submitText = document.getElementById('missionSubmitText');
+            const progress = document.getElementById('missionProgress');
+            const progressFill = document.getElementById('missionProgressFill');
+            const progressText = document.getElementById('missionProgressText');
+
+            submitBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            submitText.innerHTML = 'Inapakia...';
+            progress.style.display = 'block';
+            progressFill.style.width = '20%';
+            progressText.textContent = 'Inatayarisha data...';
+
+            try {
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('lat', lat);
+                formData.append('lng', lng);
+                formData.append('date', date);
+                formData.append('people', people);
+                formData.append('description', description || '');
+                
+                // ===== PICHA =====
+                if (photoFile) {
+                    formData.append('image', photoFile);
+                    console.log('📸 Photo appended:', photoFile.name, photoFile.size);
+                }
+                
+                // ===== VIDEO - BADILISHA BASE64 KUWA FILE =====
+                if (videoBase64 && videoBase64.length > 0) {
+                    // Badilisha base64 kuwa Blob
+                    const byteCharacters = atob(videoBase64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const videoBlob = new Blob([byteArray], { type: videoType || 'video/mp4' });
+                    
+                    // Unda File kutoka Blob
+                    const videoFile = new File([videoBlob], 'video_' + Date.now() + '.mp4', { type: videoType || 'video/mp4' });
+                    formData.append('video', videoFile);
+                    console.log('🎥 Video appended as File:', videoFile.name, videoFile.size);
+                }
+
+                progressFill.style.width = '50%';
+                progressText.textContent = 'Inapakia media...';
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                progressFill.style.width = '80%';
+                progressText.textContent = 'Inahifadhi database...';
+
+                const result = await response.json();
+                console.log('📥 Response:', result);
+
+                if (response.ok) {
+                    progressFill.style.width = '100%';
+                    progressText.textContent = '✅ Imefanikiwa!';
+
+                    let mediaType = '';
+                    if (photoFile) mediaType += 'picha ';
+                    if (videoBase64) mediaType += 'video ';
+                    showToast('✅ Umisheni wa ' + name + ' umehifadhiwa! (' + mediaType + ')', 'fa-check-circle');
+
+                    document.getElementById('missionLocationName').value = '';
+                    document.getElementById('missionLat').value = '';
+                    document.getElementById('missionLng').value = '';
+                    document.getElementById('missionPeopleCount').value = '0';
+                    document.getElementById('missionDescription').value = '';
+                    document.getElementById('missionPhoto').value = '';
+                    document.getElementById('photoPreview').style.display = 'none';
+                    document.getElementById('missionDate').value = new Date().toISOString().split('T')[0];
+                    document.getElementById('gpsStatus').className = 'gps-status';
+                    document.getElementById('gpsStatus').innerHTML =
+                        '<i class="fas fa-info-circle"></i> Bonyeza "GPS" kuchukua eneo lako la sasa';
+                    
+                    document.getElementById('videoData').value = '';
+                    document.getElementById('videoType').value = '';
+                    document.getElementById('videoPreview').src = '';
+                    document.getElementById('videoPreviewContainer').style.display = 'none';
+                    document.getElementById('videoStatus').className = 'video-status';
+                    document.getElementById('videoStatus').innerHTML = '<i class="fas fa-info-circle"></i> Video imeondolewa';
+                    startVideoBtn.style.display = 'block';
+                    startVideoBtn.classList.remove('recording');
+                    stopVideoBtn.style.display = 'none';
+
+                    await loadMissionsFromDB();
+
+                    setTimeout(() => {
+                        progress.style.display = 'none';
+                        progressFill.style.width = '0%';
+                    }, 3000);
+
+                } else {
+                    throw new Error(result.error || 'Server error');
+                }
+
+            } catch (error) {
+                console.error('❌ Submit error:', error);
+                showToast('❌ Tatizo lilitokea: ' + error.message, 'fa-exclamation-triangle', true);
+                progressFill.style.background = '#e74c3c';
+                progressText.textContent = '❌ Imeshindwa';
+            } finally {
+                submitBtn.disabled = false;
+                spinner.style.display = 'none';
+                submitText.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Hifadhi Umisheni';
+                isSubmitting = false;
+            }
+        }
+
+        // =========================================================
+        //   SET DEFAULT DATE
+        // =========================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('missionDate').value = new Date().toISOString().split('T')[0];
+        });
+
+        console.log('📋 PHID MISSION REPORT FORM - WITH VIDEO!');
+        console.log('🔑 Valid codes: PHID-2025, MISSION-2025, UMISHENI2025, PASTOR-2025');
+        console.log('📍 API URL: ' + API_URL);
+        console.log('📸 Picha itaonekana kwenye ramani!');
+        console.log('🎥 Video fupi pia itaonekana kwenye ramani!');
+        console.log('📸 Chagua picha AU rekodi video - ZOTE ZINAKUBALIWA!');
+    </script>
+
+</body>
+</html>
