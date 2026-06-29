@@ -11,13 +11,14 @@ const eventRoutes = require('./api/events');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Multer setup (for handling files in fallback routes)
+// ===== MULTER SETUP =====
 const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB - ILIYOPANULIWA
 });
 
+// ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -25,11 +26,15 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ===== ROUTES =====
+// ============================================================
+//  ROUTES ZA API
+// ============================================================
 app.use('/api', missionRoutes);
 app.use('/api', eventRoutes);
 
-// ===== FALLBACK DIRECT ROUTES WITH MULTER =====
+// ============================================================
+//  FALLBACK ROUTES
+// ============================================================
 
 // GET missions
 app.get('/api/missions', async (req, res) => {
@@ -43,35 +48,68 @@ app.get('/api/missions', async (req, res) => {
     }
 });
 
-// POST missions - WITH MULTER (handles images and videos)
+// ============================================================
+//  POST missions - WITH MULTER (ILIYOREKEBISHWA NA LOGGING)
+// ============================================================
 app.post('/api/missions', upload.fields([
     { name: 'image', maxCount: 1 },
     { name: 'video', maxCount: 1 }
 ]), async (req, res) => {
     try {
+        console.log('📥 ===== POST /api/missions =====');
+        console.log('📥 Body keys:', Object.keys(req.body));
+        console.log('📥 Files received:', req.files ? Object.keys(req.files) : 'NONE');
+
+        // ===== LOG YA KINA KWA FILES =====
+        if (req.files) {
+            if (req.files.image) {
+                console.log('📸 Image file:', req.files.image[0].originalname, req.files.image[0].size, 'bytes');
+            }
+            if (req.files.video) {
+                console.log('🎥 Video file:', req.files.video[0].originalname, req.files.video[0].size, 'bytes');
+                console.log('🎥 Video mimetype:', req.files.video[0].mimetype);
+            }
+        }
+
         const { query } = require('./config/database');
         const { name, lat, lng, date, people, description, city } = req.body;
 
         if (!name || !lat || !lng || !date) {
+            console.log('❌ Missing required fields');
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Process image
+        // ===== PICHA =====
         let imageBase64 = null;
         let imageType = null;
         if (req.files && req.files.image && req.files.image[0]) {
-            imageBase64 = req.files.image[0].buffer.toString('base64');
-            imageType = req.files.image[0].mimetype;
+            try {
+                imageBase64 = req.files.image[0].buffer.toString('base64');
+                imageType = req.files.image[0].mimetype;
+                console.log('📸 Image converted to base64, length:', imageBase64.length);
+            } catch (e) {
+                console.error('❌ Image conversion error:', e.message);
+            }
         }
 
-        // Process video
+        // ===== VIDEO =====
         let videoBase64 = null;
         let videoType = null;
         if (req.files && req.files.video && req.files.video[0]) {
-            videoBase64 = req.files.video[0].buffer.toString('base64');
-            videoType = req.files.video[0].mimetype;
+            try {
+                videoBase64 = req.files.video[0].buffer.toString('base64');
+                videoType = req.files.video[0].mimetype;
+                console.log('🎥 Video converted to base64, length:', videoBase64.length);
+            } catch (e) {
+                console.error('❌ Video conversion error:', e.message);
+            }
         }
 
+        console.log('📝 Saving to database...');
+        console.log('📸 Image saved:', imageBase64 ? 'YES' : 'NO');
+        console.log('🎥 Video saved:', videoBase64 ? 'YES' : 'NO');
+
+        // ===== INSERT KWENYE DATABASE =====
         const result = await query(`
             INSERT INTO missions 
             (name, lat, lng, city, date, people_reached, description, 
@@ -84,14 +122,21 @@ app.post('/api/missions', upload.fields([
             imageBase64, imageType, videoBase64, videoType
         ]);
 
+        console.log('✅ Saved with ID:', result[0].id);
+
         const newMission = await query('SELECT * FROM missions WHERE id = $1', [result[0].id]);
         res.status(201).json({ success: true, data: newMission[0] });
 
     } catch (error) {
-        console.error('❌ POST /api/missions error:', error.message);
+        console.error('❌ POST /api/missions ERROR:', error.message);
+        console.error('❌ Stack:', error.stack);
         res.status(500).json({ error: error.message });
     }
 });
+
+// ============================================================
+//  EVENTS ROUTES
+// ============================================================
 
 // GET events
 app.get('/api/events', async (req, res) => {
@@ -128,7 +173,9 @@ app.post('/api/events', async (req, res) => {
     }
 });
 
-// Legacy routes
+// ============================================================
+//  LEGACY ROUTES
+// ============================================================
 app.get('/converts', (req, res) => res.json([]));
 app.get('/needs', (req, res) => res.json([]));
 app.get('/events', (req, res) => res.json([]));
@@ -144,19 +191,15 @@ app.get('/', (req, res) => {
 });
 
 // ============================================================
-//  🆕 DEBUG DATABASE VIEWER - ONYESHA DATA YOTE KWENYE BROWSER
+//  DEBUG DATABASE VIEWER
 // ============================================================
 app.get('/api/debug', async (req, res) => {
     try {
         const { query } = require('./config/database');
         
-        // Pata missions zote
         const missions = await query('SELECT * FROM missions ORDER BY created_at DESC');
-        
-        // Pata events zote
         const events = await query('SELECT * FROM events ORDER BY event_date ASC');
         
-        // Onyesha kama HTML table
         let html = `
         <!DOCTYPE html>
         <html>
@@ -189,7 +232,6 @@ app.get('/api/debug', async (req, res) => {
                 .nav-links a { color: #3498db; text-decoration: none; padding: 8px 16px; border: 1px solid #3498db; border-radius: 6px; transition: all 0.3s; }
                 .nav-links a:hover { background: #3498db; color: white; }
                 .empty { text-align: center; color: #95a5a6; padding: 40px; font-size: 18px; }
-                .video-wrapper { max-width: 200px; }
                 .footer { margin-top: 20px; color: #95a5a6; font-size: 12px; text-align: center; }
                 @media (max-width: 768px) {
                     table { font-size: 12px; }
@@ -224,7 +266,7 @@ app.get('/api/debug', async (req, res) => {
                 </div>
                 
                 <h2>📋 MISSIONS (${missions.length})</h2>
-                ${missions.length === 0 ? '<div class="empty">No missions found yet. Go to <a href="/mission-report">Mission Form</a> to add some!</div>' : `
+                ${missions.length === 0 ? '<div class="empty">No missions found yet.</div>' : `
                 <div class="table-wrapper">
                 <table>
                     <thead>
@@ -333,10 +375,7 @@ app.get('/api/debug', async (req, res) => {
         
         res.send(html);
     } catch (error) {
-        res.status(500).json({ 
-            error: error.message,
-            stack: error.stack 
-        });
+        res.status(500).json({ error: error.message });
     }
 });
 
