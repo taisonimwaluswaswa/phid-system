@@ -4,29 +4,12 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== HAKIKISHA FOLDER ZIPO =====
-const uploadsDir = path.join(__dirname, 'uploads');
-const missionsDir = path.join(uploadsDir, 'missions');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-if (!fs.existsSync(missionsDir)) fs.mkdirSync(missionsDir, { recursive: true });
-
-// ===== MULTER DISKSTORAGE =====
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, missionsDir);
-    },
-    filename: function (req, file, cb) {
-        const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        cb(null, file.fieldname + '_' + unique + ext);
-    }
-});
-
+// ===== MULTER MEMORY STORAGE (BASE64) =====
+const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
     limits: { fileSize: 100 * 1024 * 1024 } // 100MB
@@ -40,9 +23,7 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ============================================================
-//  DATABASE
-// ============================================================
+// ===== DATABASE =====
 const { query } = require('./config/database');
 
 // ============================================================
@@ -59,7 +40,7 @@ app.get('/api/missions', async (req, res) => {
 });
 
 // ============================================================
-//  POST MISSION - ILIYOSAHIHISHWA
+//  POST MISSION - MEMORY STORAGE (BASE64)
 // ============================================================
 app.post('/api/missions', upload.fields([
     { name: 'image', maxCount: 1 },
@@ -76,37 +57,35 @@ app.post('/api/missions', upload.fields([
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // ===== PICHA =====
-        let imagePath = null;
+        // ===== PICHA (base64) =====
+        let imageBase64 = null;
         let imageType = null;
         if (req.files && req.files.image && req.files.image.length > 0) {
-            const file = req.files.image[0];
-            imagePath = '/uploads/missions/' + file.filename;
-            imageType = file.mimetype;
-            console.log('📸 Image saved:', imagePath);
+            imageBase64 = req.files.image[0].buffer.toString('base64');
+            imageType = req.files.image[0].mimetype;
+            console.log('📸 Image size:', req.files.image[0].size);
         }
 
-        // ===== VIDEO =====
-        let videoPath = null;
+        // ===== VIDEO (base64) =====
+        let videoBase64 = null;
         let videoType = null;
         if (req.files && req.files.video && req.files.video.length > 0) {
-            const file = req.files.video[0];
-            videoPath = '/uploads/missions/' + file.filename;
-            videoType = file.mimetype;
-            console.log('🎥 Video saved:', videoPath);
+            videoBase64 = req.files.video[0].buffer.toString('base64');
+            videoType = req.files.video[0].mimetype;
+            console.log('🎥 Video size:', req.files.video[0].size);
         }
 
-        // ===== INSERT - HAKIKISHA ID INAGET OK =====
+        // ===== INSERT =====
         const result = await query(`
             INSERT INTO missions 
             (name, lat, lng, city, date, people_reached, description, 
-             image_path, image_type, video_path, video_type, created_at) 
+             image_base64, image_type, video_base64, video_type, created_at) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
             RETURNING id
         `, [
             name, parseFloat(lat), parseFloat(lng), city || '', date,
             parseInt(people) || 0, description || '',
-            imagePath, imageType, videoPath, videoType
+            imageBase64, imageType, videoBase64, videoType
         ]);
 
         console.log('✅ Saved ID:', result[0].id);
@@ -116,15 +95,44 @@ app.post('/api/missions', upload.fields([
 
     } catch (error) {
         console.error('❌ POST ERROR:', error.message);
-        console.error('❌ Stack:', error.stack);
         
-        // Kama error ni duplicate key, rekebisha sequence
-        if (error.message.includes('duplicate key') || error.message.includes('violates unique constraint')) {
+        // ===== FIX DUPLICATE KEY ERROR =====
+        if (error.message.includes('duplicate key value violates unique constraint')) {
             try {
-                await query(`SELECT setval('missions_id_seq', COALESCE((SELECT MAX(id) FROM missions), 0) + 1, false)`);
-                console.log('✅ Sequence reset successfully');
-            } catch (seqError) {
-                console.error('❌ Sequence reset failed:', seqError.message);
+                // Reset sequence
+                await query(`SELECT setval('missions_id_seq', (SELECT COALESCE(MAX(id), 0) FROM missions))`);
+                console.log('🔄 Sequence reset successfully');
+                
+                // Jaribu tena
+                const { name, lat, lng, date, people, description, city } = req.body;
+                let imageBase64 = null, imageType = null, videoBase64 = null, videoType = null;
+                
+                if (req.files && req.files.image && req.files.image.length > 0) {
+                    imageBase64 = req.files.image[0].buffer.toString('base64');
+                    imageType = req.files.image[0].mimetype;
+                }
+                if (req.files && req.files.video && req.files.video.length > 0) {
+                    videoBase64 = req.files.video[0].buffer.toString('base64');
+                    videoType = req.files.video[0].mimetype;
+                }
+                
+                const result = await query(`
+                    INSERT INTO missions 
+                    (name, lat, lng, city, date, people_reached, description, 
+                     image_base64, image_type, video_base64, video_type, created_at) 
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+                    RETURNING id
+                `, [
+                    name, parseFloat(lat), parseFloat(lng), city || '', date,
+                    parseInt(people) || 0, description || '',
+                    imageBase64, imageType, videoBase64, videoType
+                ]);
+                
+                const newMission = await query('SELECT * FROM missions WHERE id = $1', [result[0].id]);
+                return res.status(201).json({ success: true, data: newMission[0] });
+            } catch (retryError) {
+                console.error('❌ Retry error:', retryError.message);
+                return res.status(500).json({ error: retryError.message });
             }
         }
         
@@ -189,176 +197,61 @@ app.get('/api/debug', async (req, res) => {
         let html = `
         <!DOCTYPE html>
         <html>
-        <head>
-            <title>PHID Database</title>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                * { box-sizing: border-box; }
-                body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f0f2f5; }
-                .container { max-width: 1400px; margin: 0 auto; }
-                h1 { color: #2c3e50; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-                h1 small { font-size: 16px; font-weight: normal; color: #7f8c8d; }
-                h2 { color: #34495e; margin-top: 30px; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-                .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
-                .stat-card { background: white; padding: 15px 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex: 1; min-width: 150px; }
-                .stat-card .number { font-size: 28px; font-weight: bold; color: #2c3e50; }
-                .stat-card .label { color: #7f8c8d; font-size: 14px; }
-                .table-wrapper { overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 10px; }
-                table { width: 100%; border-collapse: collapse; font-size: 14px; }
-                th { background: #2c3e50; color: white; padding: 12px 10px; text-align: left; position: sticky; top: 0; z-index: 10; }
-                td { padding: 10px; border-bottom: 1px solid #ecf0f1; vertical-align: middle; }
-                tr:hover td { background: #f8f9fa; }
-                .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-                .badge-yes { background: #d4edda; color: #155724; }
-                .badge-no { background: #f8d7da; color: #721c24; }
-                .media-preview { max-width: 120px; max-height: 120px; border-radius: 8px; margin-top: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; }
-                video.media-preview { max-width: 180px; max-height: 120px; }
-                .nav-links { margin-top: 30px; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 20px; flex-wrap: wrap; }
-                .nav-links a { color: #3498db; text-decoration: none; padding: 8px 16px; border: 1px solid #3498db; border-radius: 6px; transition: all 0.3s; }
-                .nav-links a:hover { background: #3498db; color: white; }
-                .empty { text-align: center; color: #95a5a6; padding: 40px; font-size: 18px; }
-                .footer { margin-top: 20px; color: #95a5a6; font-size: 12px; text-align: center; }
-                @media (max-width: 768px) {
-                    table { font-size: 12px; }
-                    td, th { padding: 6px 4px; }
-                    .media-preview { max-width: 60px; max-height: 60px; }
-                    video.media-preview { max-width: 80px; max-height: 60px; }
-                    .stat-card .number { font-size: 20px; }
-                }
-            </style>
+        <head><title>PHID Database</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body { font-family: Arial; margin: 20px; background: #f0f2f5; }
+            .container { max-width: 1200px; margin: auto; }
+            h1 { color: #2c3e50; }
+            .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+            .stat-card { background: white; padding: 15px 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .stat-card .number { font-size: 28px; font-weight: bold; }
+            .stat-card .label { color: #7f8c8d; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
+            th { background: #2c3e50; color: white; padding: 10px; text-align: left; }
+            td { padding: 10px; border-bottom: 1px solid #ecf0f1; vertical-align: middle; }
+            .badge-yes { background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+            .badge-no { background: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+            img, video { max-width: 150px; max-height: 120px; border-radius: 6px; }
+        </style>
         </head>
         <body>
-            <div class="container">
-                <h1>📊 PHID DATABASE VIEWER <small>Potters House International Dar es Salaam</small></h1>
-                
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="number">${missions.length}</div>
-                        <div class="label">📋 Missions</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="number">${events.length}</div>
-                        <div class="label">📅 Events</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="number">${missions.filter(m => m.image_path).length}</div>
-                        <div class="label">📸 With Images</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="number">${missions.filter(m => m.video_path).length}</div>
-                        <div class="label">🎥 With Videos</div>
-                    </div>
-                </div>
-                
-                <h2>📋 MISSIONS (${missions.length})</h2>
-                ${missions.length === 0 ? '<div class="empty">No missions found yet.</div>' : `
-                <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name / Description</th>
-                            <th>Location</th>
-                            <th>City</th>
-                            <th>Date</th>
-                            <th>People</th>
-                            <th>Image</th>
-                            <th>Video</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${missions.map(m => `
-                            <tr>
-                                <td><strong>${m.id}</strong></td>
-                                <td>
-                                    <strong>${m.name}</strong>
-                                    ${m.description ? `<br><small style="color:#666;">${m.description.substring(0, 60)}${m.description.length > 60 ? '...' : ''}</small>` : ''}
-                                </td>
-                                <td>${m.lat}, ${m.lng}</td>
-                                <td>${m.city || '-'}</td>
-                                <td>${m.date}</td>
-                                <td>${m.people_reached || 0}</td>
-                                <td>
-                                    ${m.image_path ? `
-                                        <span class="badge badge-yes">✅ YES</span><br>
-                                        <img src="${m.image_path}" 
-                                             class="media-preview" 
-                                             onclick="window.open(this.src)" 
-                                             alt="Image">
-                                    ` : `<span class="badge badge-no">❌ NO</span>`}
-                                </td>
-                                <td>
-                                    ${m.video_path ? `
-                                        <span class="badge badge-yes">✅ YES</span><br>
-                                        <div class="video-wrapper">
-                                            <video controls class="media-preview" 
-                                                   onclick="this.paused ? this.play() : this.pause();">
-                                                <source src="${m.video_path}">
-                                            </video>
-                                        </div>
-                                    ` : `<span class="badge badge-no">❌ NO</span>`}
-                                </td>
-                                <td style="font-size:12px; color:#666;">${new Date(m.created_at).toLocaleString()}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                </div>
-                `}
-                
-                <h2>📅 EVENTS (${events.length})</h2>
-                ${events.length === 0 ? '<div class="empty">No events found yet.</div>' : `
-                <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Title / Description</th>
-                            <th>Date</th>
-                            <th>Time</th>
-                            <th>Category</th>
-                            <th>Holiday</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${events.map(e => `
-                            <tr>
-                                <td>${e.id}</td>
-                                <td>
-                                    <strong>${e.title}</strong>
-                                    ${e.description ? `<br><small style="color:#666;">${e.description.substring(0, 50)}${e.description.length > 50 ? '...' : ''}</small>` : ''}
-                                </td>
-                                <td>${e.event_date}</td>
-                                <td>${e.event_time || '-'}</td>
-                                <td><span style="background:#e8f0fe; padding:3px 10px; border-radius:12px;">${e.category || 'Nyingine'}</span></td>
-                                <td>${e.is_holiday ? '✅ Yes' : '❌ No'}</td>
-                                <td style="font-size:12px; color:#666;">${new Date(e.created_at).toLocaleString()}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                </div>
-                `}
-                
-                <div class="nav-links">
-                    <a href="/api/debug">🔄 Refresh</a>
-                    <a href="/">🏠 Home</a>
-                    <a href="/mission-report">📋 Mission Form</a>
-                    <a href="/api/missions">📡 Missions API (JSON)</a>
-                    <a href="/api/events">📡 Events API (JSON)</a>
-                </div>
-                
-                <div class="footer">
-                    PHID System v1.0 | ${new Date().toLocaleString()}
-                </div>
+        <div class="container">
+            <h1>📊 PHID DATABASE</h1>
+            <div class="stats">
+                <div class="stat-card"><div class="number">${missions.length}</div><div class="label">Missions</div></div>
+                <div class="stat-card"><div class="number">${events.length}</div><div class="label">Events</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.image_base64).length}</div><div class="label">With Images</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.video_base64).length}</div><div class="label">With Videos</div></div>
             </div>
+            <h2>📋 MISSIONS</h2>
+            <table>
+                <tr><th>ID</th><th>Name</th><th>Location</th><th>Date</th><th>Image</th><th>Video</th></tr>
+                ${missions.map(m => `
+                    <tr>
+                        <td>${m.id}</td>
+                        <td>${m.name}</td>
+                        <td>${m.lat}, ${m.lng}</td>
+                        <td>${m.date}</td>
+                        <td>${m.image_base64 ? `<span class="badge-yes">YES</span><br><img src="data:${m.image_type};base64,${m.image_base64}">` : '<span class="badge-no">NO</span>'}</td>
+                        <td>${m.video_base64 ? `<span class="badge-yes">YES</span><br><video controls src="data:${m.video_type};base64,${m.video_base64}" style="max-width:150px;max-height:100px;"></video>` : '<span class="badge-no">NO</span>'}</td>
+                    </tr>
+                `).join('')}
+            </table>
+            <h2>📅 EVENTS</h2>
+            <table>
+                <tr><th>ID</th><th>Title</th><th>Date</th><th>Category</th></tr>
+                ${events.map(e => `
+                    <tr><td>${e.id}</td><td>${e.title}</td><td>${e.event_date}</td><td>${e.category}</td></tr>
+                `).join('')}
+            </table>
+            <br>
+            <a href="/api/debug">🔄 Refresh</a> | <a href="/">🏠 Home</a> | <a href="/mission-report">📋 Form</a>
+        </div>
         </body>
         </html>
         `;
-        
         res.send(html);
     } catch (error) {
         res.status(500).json({ error: error.message });
