@@ -4,42 +4,27 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== HAKIKISHA FOLDER ZIPO =====
-const uploadsDir = path.join(__dirname, 'uploads');
-const missionsDir = path.join(uploadsDir, 'missions');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-if (!fs.existsSync(missionsDir)) fs.mkdirSync(missionsDir, { recursive: true });
-
-// ===== MULTER - DISKSTORAGE =====
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, missionsDir);
-    },
-    filename: function (req, file, cb) {
-        const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        cb(null, file.fieldname + '_' + unique + ext);
-    }
-});
-
+// ===== MULTER - MEMORY STORAGE (BASE64) =====
+const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 100 * 1024 * 1024 }
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB
 });
 
-// ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ===== DATABASE =====
+// ============================================================
+//  DATABASE
+// ============================================================
 const { query } = require('./config/database');
 
 // ============================================================
@@ -56,7 +41,7 @@ app.get('/api/missions', async (req, res) => {
 });
 
 // ============================================================
-//  POST MISSION
+//  POST MISSION - MEMORY STORAGE (BASE64)
 // ============================================================
 app.post('/api/missions', upload.fields([
     { name: 'image', maxCount: 1 },
@@ -64,7 +49,7 @@ app.post('/api/missions', upload.fields([
 ]), async (req, res) => {
     try {
         console.log('📥 ===== POST /api/missions =====');
-        console.log('📥 Body:', req.body);
+        console.log('📥 Body keys:', Object.keys(req.body));
         console.log('📥 Files:', req.files ? Object.keys(req.files) : 'NONE');
 
         const { name, lat, lng, date, people, description, city } = req.body;
@@ -73,63 +58,60 @@ app.post('/api/missions', upload.fields([
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // ===== PICHA =====
-        let imagePath = null;
+        // ===== PICHA - BASE64 =====
+        let imageBase64 = null;
         let imageType = null;
-        if (req.files && req.files.image && req.files.image.length > 0) {
-            const file = req.files.image[0];
-            imagePath = '/uploads/missions/' + file.filename;
-            imageType = file.mimetype;
-            console.log('📸 Image saved:', imagePath);
+        if (req.files && req.files.image && req.files.image[0]) {
+            try {
+                imageBase64 = req.files.image[0].buffer.toString('base64');
+                imageType = req.files.image[0].mimetype;
+                console.log('📸 Image OK, size:', req.files.image[0].size);
+            } catch (e) {
+                console.error('❌ Image error:', e.message);
+            }
         }
 
-        // ===== VIDEO =====
-        let videoPath = null;
+        // ===== VIDEO - BASE64 =====
+        let videoBase64 = null;
         let videoType = null;
-        if (req.files && req.files.video && req.files.video.length > 0) {
-            const file = req.files.video[0];
-            videoPath = '/uploads/missions/' + file.filename;
-            videoType = file.mimetype;
-            console.log('🎥 Video saved:', videoPath);
+        if (req.files && req.files.video && req.files.video[0]) {
+            try {
+                videoBase64 = req.files.video[0].buffer.toString('base64');
+                videoType = req.files.video[0].mimetype;
+                console.log('🎥 Video OK, size:', req.files.video[0].size);
+            } catch (e) {
+                console.error('❌ Video error:', e.message);
+            }
         }
 
-        // ===== INSERT =====
+        // ===== INSERT KWENYE DATABASE (TUMIA image_base64 na video_base64) =====
         const result = await query(`
             INSERT INTO missions 
             (name, lat, lng, city, date, people_reached, description, 
-             image_path, image_type, video_path, video_type, created_at) 
+             image_base64, image_type, video_base64, video_type, created_at) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
             RETURNING id
         `, [
             name, parseFloat(lat), parseFloat(lng), city || '', date,
             parseInt(people) || 0, description || '',
-            imagePath, imageType, videoPath, videoType
+            imageBase64, imageType, videoBase64, videoType
         ]);
 
         console.log('✅ Saved ID:', result[0].id);
+        console.log('📸 Image saved:', imageBase64 ? 'YES' : 'NO');
+        console.log('🎥 Video saved:', videoBase64 ? 'YES' : 'NO');
 
         const newMission = await query('SELECT * FROM missions WHERE id = $1', [result[0].id]);
         res.status(201).json({ success: true, data: newMission[0] });
 
     } catch (error) {
         console.error('❌ POST ERROR:', error.message);
-        
-        // ===== IKIWA DUPLICATE KEY, REKEBISHA SEQUENCE =====
-        if (error.message.includes('duplicate key')) {
-            try {
-                await query(`SELECT setval('missions_id_seq', (SELECT COALESCE(MAX(id), 0) FROM missions) + 1)`);
-                console.log('✅ Sequence reset successfully');
-            } catch (seqError) {
-                console.error('❌ Sequence reset failed:', seqError.message);
-            }
-        }
-        
         res.status(500).json({ error: error.message });
     }
 });
 
 // ============================================================
-//  EVENTS
+//  EVENTS ROUTES
 // ============================================================
 app.get('/api/events', async (req, res) => {
     try {
@@ -213,8 +195,8 @@ app.get('/api/debug', async (req, res) => {
             <div class="stats">
                 <div class="stat-card"><div class="number">${missions.length}</div><div class="label">Missions</div></div>
                 <div class="stat-card"><div class="number">${events.length}</div><div class="label">Events</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.image_path).length}</div><div class="label">With Images</div></div>
-                <div class="stat-card"><div class="number">${missions.filter(m => m.video_path).length}</div><div class="label">With Videos</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.image_base64).length}</div><div class="label">With Images</div></div>
+                <div class="stat-card"><div class="number">${missions.filter(m => m.video_base64).length}</div><div class="label">With Videos</div></div>
             </div>
             <h2>📋 MISSIONS</h2>
             <table>
@@ -225,8 +207,8 @@ app.get('/api/debug', async (req, res) => {
                         <td>${m.name}</td>
                         <td>${m.lat}, ${m.lng}</td>
                         <td>${m.date}</td>
-                        <td>${m.image_path ? `<span class="badge-yes">YES</span><br><img src="${m.image_path}" style="max-width:120px;">` : '<span class="badge-no">NO</span>'}</td>
-                        <td>${m.video_path ? `<span class="badge-yes">YES</span><br><video controls src="${m.video_path}" style="max-width:180px;max-height:120px;"></video>` : '<span class="badge-no">NO</span>'}</td>
+                        <td>${m.image_base64 ? `<span class="badge-yes">YES</span><br><img src="data:${m.image_type || 'image/png'};base64,${m.image_base64}" style="max-width:120px;">` : '<span class="badge-no">NO</span>'}</td>
+                        <td>${m.video_base64 ? `<span class="badge-yes">YES</span><br><video controls src="data:${m.video_type || 'video/mp4'};base64,${m.video_base64}" style="max-width:180px;max-height:120px;"></video>` : '<span class="badge-no">NO</span>'}</td>
                     </tr>
                 `).join('')}
             </table>
@@ -241,8 +223,6 @@ app.get('/api/debug', async (req, res) => {
                 <a href="/api/debug">🔄 Refresh</a>
                 <a href="/">🏠 Home</a>
                 <a href="/mission-report">📋 Mission Form</a>
-                <a href="/api/missions">📡 Missions API</a>
-                <a href="/api/events">📡 Events API</a>
             </div>
         </div>
         </body>
